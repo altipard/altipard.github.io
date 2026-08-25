@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LimnoNetz Sensorfinder</title>
+<meta name="description" content="Welcher Sensor passt zu eurem Gewässer? Auswahlhilfe für Dragino-Wassersensoren (NB-IoT und LoRaWAN), aus dem Technik-Wiki für Vereine übersetzt.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3.33C10.84 5.48 7.13 9.07 5.75 12.78 4.2 17 7.38 20.63 12 20.63c4.61 0 7.81-3.63 6.25-7.85C16.87 9.07 13.16 5.48 12 3.33Z' fill='none' stroke='%232a6f5f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='m7.6 15.2 3.1-3.2 2.9 3.2 2.7-3.2' fill='none' stroke='%232a6f5f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+  :root{
+    /* LimnoNetz-Tokens (limnonetz.de) */
+    --bg:#f4f0e7;            /* --ln-surface */
+    --surface:#fffdf9;       /* --ln-card */
+    --nav-bg:#fffdf9;        /* --ln-nav-bg */
+    --nav-line:#e3ddd0;      /* --ln-nav-line */
+    --ink:#24312c;           /* --ln-ink */
+    --muted:#5f6e66;         /* --ln-ink-muted */
+    --line:#e8e3d8;          /* --ln-line */
+    --accent:#2a6f5f;        /* --ln-primary */
+    --accent-ink:#1c4f43;    /* --ln-primary-deep */
+    --accent-soft:#e2ebe6;
+    --ok:#3d7a34;            /* --ln-ok */
+    --ok-soft:#e6efdf;
+    --code-bg:#eee9dc;
+    --s-oxy:#3d7a34;  --s-oxy-soft:#e6efdf;   /* --ln-series-oxygen */
+    --s-temp:#cf5f43; --s-temp-soft:#f8e7e1;  /* --ln-series-temp */
+    --s-level:#2f7fa0;--s-level-soft:#e2edf2; /* --ln-series-level */
+    --radius:8px;            /* --ln-radius */
+    --radius-sm:6px;
+    --shadow:0 1px 2px rgb(28 79 67 / .06),0 4px 12px rgb(28 79 67 / .08);   /* --ln-shadow */
+    --shadow-raised:0 2px 4px rgb(28 79 67 / .07),0 10px 24px rgb(28 79 67 / .10);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#141b17;
+      --surface:#1b2621;
+      --nav-bg:#1b2621;
+      --nav-line:#2b3a33;
+      --ink:#e7ece7;
+      --muted:#9cab9f;
+      --line:#2a3831;
+      --accent:#6fb3a2;
+      --accent-ink:#93cdbd;
+      --accent-soft:#20342d;
+      --ok:#7cb96c;
+      --ok-soft:#22331d;
+      --code-bg:#242f26;
+      --s-oxy:#7cb96c;  --s-oxy-soft:#22331d;
+      --s-temp:#e08a72; --s-temp-soft:#3a2620;
+      --s-level:#6aaac8;--s-level-soft:#1d2f38;
+      --shadow:0 1px 2px rgb(0 0 0 / .3),0 4px 12px rgb(0 0 0 / .35);
+      --shadow-raised:0 2px 4px rgb(0 0 0 / .35),0 10px 24px rgb(0 0 0 / .45);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#141b17;
+    --surface:#1b2621;
+    --nav-bg:#1b2621;
+    --nav-line:#2b3a33;
+    --ink:#e7ece7;
+    --muted:#9cab9f;
+    --line:#2a3831;
+    --accent:#6fb3a2;
+    --accent-ink:#93cdbd;
+    --accent-soft:#20342d;
+    --ok:#7cb96c;
+    --ok-soft:#22331d;
+    --code-bg:#242f26;
+    --s-oxy:#7cb96c;  --s-oxy-soft:#22331d;
+    --s-temp:#e08a72; --s-temp-soft:#3a2620;
+    --s-level:#6aaac8;--s-level-soft:#1d2f38;
+    --shadow:0 1px 2px rgb(0 0 0 / .3),0 4px 12px rgb(0 0 0 / .35);
+    --shadow-raised:0 2px 4px rgb(0 0 0 / .35),0 10px 24px rgb(0 0 0 / .45);
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:16.5px;line-height:1.55;margin:0;
+  }
+  img{max-width:100%}
+
+  /* Markenleiste wie auf limnonetz.de */
+  .brandbar{
+    background:var(--nav-bg);
+    border-bottom:1px solid var(--nav-line);
+  }
+  .brandbar .inner{
+    max-width:1060px;margin:0 auto;padding:12px 20px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .brand{
+    display:inline-flex;align-items:center;gap:9px;
+    font-weight:700;font-size:1.22rem;color:var(--ink);letter-spacing:-.01em;
+  }
+  .brand svg{width:27px;height:27px;color:var(--accent);flex-shrink:0}
+  .brandbar .app{
+    margin-left:auto;font-size:.85rem;font-weight:600;color:var(--muted);
+    letter-spacing:.08em;text-transform:uppercase;
+  }
+
+  .wrap{max-width:1060px;margin:0 auto;padding:0 20px 72px}
+  header.hero{padding:44px 0 8px}
+  .eyebrow{
+    font-weight:600;font-size:.78rem;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--accent);
+    display:flex;align-items:center;gap:.55em;margin-bottom:14px;
+  }
+  .eyebrow::before{content:"";width:26px;height:3px;border-radius:2px;background:var(--accent)}
+  h1{
+    font-weight:800;
+    font-size:clamp(1.9rem,4.5vw,2.8rem);line-height:1.08;
+    letter-spacing:-.02em;margin:0 0 14px;text-wrap:balance;
+  }
+  .lede{max-width:62ch;color:var(--muted);font-size:1.08rem;margin:0 0 8px}
+  .lede strong{color:var(--ink)}
+  h2{
+    font-weight:700;font-size:1.3rem;
+    letter-spacing:-.01em;margin:0 0 6px;text-wrap:balance;
+  }
+  .sec{margin-top:44px}
+  .sec > p.sub{color:var(--muted);margin:0 0 18px;max-width:70ch}
+
+  /* Szenarien */
+  .scenarios{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:16px}
+  .scenario{
+    text-align:left;font:inherit;cursor:pointer;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:12px 14px;color:var(--ink);box-shadow:var(--shadow);
+    transition:border-color .15s, transform .15s;
+  }
+  .scenario:hover{border-color:var(--accent);transform:translateY(-1px)}
+  .scenario:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .scenario .q{font-weight:700;display:block;margin-bottom:2px}
+  .scenario .a{font-size:.85rem;color:var(--muted)}
+
+  /* Filterleiste */
+  .toolbar{
+    position:sticky;top:0;z-index:5;
+    background:var(--bg);
+    padding:14px 0 12px;margin-top:34px;
+    border-bottom:1px solid var(--line);
+  }
+  .search{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .search input{
+    flex:1;min-width:220px;
+    font:inherit;color:var(--ink);
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);
+    padding:9px 14px;
+  }
+  .search input::placeholder{color:var(--muted)}
+  .search input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  .seg{
+    display:inline-flex;border:1px solid var(--line);border-radius:999px;
+    background:var(--surface);padding:3px;gap:2px;
+  }
+  .seg-btn{
+    font:inherit;font-size:.88rem;font-weight:600;cursor:pointer;
+    border:0;border-radius:999px;padding:5px 14px;
+    background:transparent;color:var(--muted);
+    transition:background .12s,color .12s;
+  }
+  .seg-btn[aria-pressed="true"]{background:var(--accent);color:var(--surface)}
+  .seg-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .seg-hint{font-size:.85rem;color:var(--muted);flex-basis:100%;margin-top:2px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{
+    font:inherit;font-size:.92rem;font-weight:600;cursor:pointer;
+    border:1px solid var(--line);border-radius:999px;
+    background:var(--surface);color:var(--ink);
+    padding:5px 14px;transition:background .12s,border-color .12s,color .12s;
+  }
+  .chip:hover{border-color:var(--accent)}
+  .chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+  .chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .chip.reset{border-style:dashed;color:var(--muted);font-weight:400}
+  .count{font-size:.88rem;color:var(--muted);margin-top:10px}
+
+  /* Kombi-Tipp */
+  .combo{
+    display:none;margin-top:12px;
+    background:var(--accent-soft);border:1px solid var(--accent);
+    border-radius:var(--radius);padding:12px 16px;font-size:.95rem;
+  }
+  .combo.show{display:block}
+  .combo b{color:var(--accent-ink)}
+
+  /* Karten */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-top:22px}
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 18px 16px;box-shadow:var(--shadow);
+    display:flex;flex-direction:column;gap:10px;
+  }
+  .kind{
+    font-size:.7rem;font-weight:600;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+  }
+  .kind.base{color:var(--accent)}
+  .code{
+    font-family:"Geist Mono",ui-monospace,monospace;font-weight:600;font-size:.85rem;
+    background:var(--code-bg);border-radius:var(--radius-sm);padding:2px 8px;
+    display:inline-block;color:var(--accent-ink);
+  }
+  .card h3{font-weight:700;font-size:1.08rem;margin:2px 0 0;line-height:1.25}
+  .card p.desc{margin:0;font-size:.95rem;color:var(--muted)}
+  .badges{display:flex;flex-wrap:wrap;gap:6px}
+  .badge{
+    font-size:.8rem;font-weight:600;border-radius:999px;padding:2.5px 11px;
+    background:var(--accent-soft);color:var(--accent-ink);
+    border:1px solid transparent;
+  }
+  .badge.m-o2{background:var(--s-oxy-soft);color:var(--s-oxy)}
+  .badge.m-temp{background:var(--s-temp-soft);color:var(--s-temp)}
+  .badge.m-level{background:var(--s-level-soft);color:var(--s-level)}
+  .badge.inkl{background:transparent;border:1px dashed currentColor}
+  .badge.inkl:not(.m-o2):not(.m-temp):not(.m-level){color:var(--ok)}
+  .badge.hit{box-shadow:0 0 0 2px var(--accent)}
+  .specs{
+    border-top:1px solid var(--line);padding-top:10px;margin-top:auto;
+    display:grid;gap:4px;font-size:.88rem;
+  }
+  .specs div{display:flex;gap:8px}
+  .specs dt{color:var(--muted);min-width:88px;flex-shrink:0;font-weight:600}
+  .specs dd{margin:0}
+  .note{
+    font-size:.83rem;color:var(--muted);border-left:3px solid var(--accent);
+    padding:2px 0 2px 10px;
+  }
+
+  /* Callout */
+  .callout{
+    background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--ok);
+    border-radius:var(--radius);padding:16px 20px;margin-top:26px;box-shadow:var(--shadow);
+  }
+  .callout h2{font-size:1.08rem;margin-bottom:4px}
+  .callout p{margin:0;font-size:.97rem;color:var(--muted);max-width:75ch}
+  .callout p strong{color:var(--ink)}
+
+  /* Namenscode */
+  .decoder{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:16px}
+  .dec{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px;box-shadow:var(--shadow);
+  }
+  .dec .code{margin-bottom:6px}
+  .dec p{margin:6px 0 0;font-size:.92rem;color:var(--muted)}
+  .dec p b{color:var(--ink)}
+
+  footer{
+    margin-top:56px;border-top:1px solid var(--line);padding-top:18px;
+    font-size:.87rem;color:var(--muted);
+  }
+  footer a{color:var(--accent);text-decoration:none}
+  footer a:hover{text-decoration:underline}
+  @media (prefers-reduced-motion: reduce){
+    .scenario,.chip{transition:none}
+    .scenario:hover{transform:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="brandbar">
+  <div class="inner">
+    <span class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3.33C10.84 5.48 7.13 9.07 5.75 12.78 4.2 17 7.38 20.63 12 20.63c4.61 0 7.81-3.63 6.25-7.85C16.87 9.07 13.16 5.48 12 3.33Z"/>
+        <path d="m7.6 15.2 3.1-3.2 2.9 3.2 2.7-3.2"/>
+      </svg>
+      LimnoNetz
+    </span>
+    <span class="app">Sensorfinder</span>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">Auswahlhilfe · NB-IoT</div>
+    <h1>Welcher Sensor passt zu eurem Gewässer?</h1>
+    <p class="lede">Die Dragino-Übersicht ist für Techniker geschrieben – diese Seite übersetzt sie für Vereine.
+    Wählt aus, <strong>was ihr messen wollt</strong>, und ihr seht sofort die passenden Geräte,
+    welche Werte sie <strong>gratis mitliefern</strong> und wie lang die Kabel sind – wahlweise als
+    <strong>NB-IoT-</strong> oder <strong>LoRaWAN-Variante</strong>, die Sensorik ist baugleich.</p>
+  </header>
+
+  <section class="sec" aria-labelledby="h-szenarien">
+    <h2 id="h-szenarien">Typische Vereinsfragen</h2>
+    <p class="sub">Ein Klick setzt die passenden Filter.</p>
+    <div class="scenarios">
+      <button class="scenario" data-set="o2"><span class="q">Reicht der Sauerstoff im Sommer?</span><span class="a">O₂-Sonde – Temperatur ist inklusive</span></button>
+      <button class="scenario" data-set="temp"><span class="q">Wie warm ist es in der Tiefe?</span><span class="a">Temperaturfühler in bis zu 3 Tiefen</span></button>
+      <button class="scenario" data-set="level"><span class="q">Sinkt der Wasserstand?</span><span class="a">Pegel per Drucksonde oder Ultraschall</span></button>
+      <button class="scenario" data-set="turb,ph"><span class="q">Was passiert nach Starkregen?</span><span class="a">Trübung und pH im Blick behalten</span></button>
+      <button class="scenario" data-set="flow"><span class="q">Was bringt der Zulauf?</span><span class="a">Durchfluss am Rohr messen</span></button>
+    </div>
+  </section>
+
+  <div class="toolbar" id="toolbar">
+    <div class="search">
+      <div class="seg" role="group" aria-label="Funkweg wählen">
+        <button class="seg-btn" data-radio="nb" aria-pressed="true">NB-IoT · Mobilfunk</button>
+        <button class="seg-btn" data-radio="lora" aria-pressed="false">LoRaWAN · Gateway</button>
+      </div>
+      <input id="q" type="search" placeholder="Suchen … z. B. Sauerstoff, WQS, Pegel, Kabel" aria-label="Sensoren durchsuchen">
+      <span class="seg-hint" id="seghint">NB-IoT funkt übers Mobilfunknetz – jedes Gerät braucht eine SIM, dafür kein eigenes Gateway.</span>
+    </div>
+    <div class="chips" id="chips" role="group" aria-label="Nach Messwert filtern"></div>
+    <div class="combo" id="combo"></div>
+    <div class="count" id="count"></div>
+  </div>
+
+  <section class="sec" aria-labelledby="h-ergebnisse" style="margin-top:18px">
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <div class="callout">
+    <h2>Ein Sensor, mehrere Werte</h2>
+    <p>Viele Sonden messen mehr als ihren Hauptwert: Die <strong>Sauerstoff-Sonde liefert die Wassertemperatur
+    gleich mit</strong> – ein zusätzlicher Temperaturfühler ist dann überflüssig. Solche Gratis-Werte sind auf den
+    Karten gestrichelt markiert („inkl.“). Und: Ein WQS-Grundgerät nimmt <strong>bis zu drei Sonden
+    gleichzeitig</strong> auf – Sauerstoff, pH und Trübung laufen also über ein einziges Gerät und eine SIM-Karte.</p>
+  </div>
+
+  <section class="sec" aria-labelledby="h-funk">
+    <h2 id="h-funk">NB-IoT oder LoRaWAN – was passt zu euch?</h2>
+    <p class="sub">Beide Wege liefern dieselben Messwerte; der Unterschied ist, wie die Daten vom Ufer ins Internet kommen.</p>
+    <div class="decoder">
+      <div class="dec"><span class="code">NB-IoT</span><p><b>Funkt übers Mobilfunknetz.</b> Jedes Gerät braucht eine SIM-Karte (laufende Kosten, z. B. 1NCE), dafür kein eigenes Gateway. Ideal für <b>einzelne, verstreute Standorte</b> – vorausgesetzt, am Gewässer gibt es Mobilfunkempfang.</p></div>
+      <div class="dec"><span class="code">LoRaWAN</span><p><b>Funkt zu einem eigenen Gateway</b> (oder einem Community-Netz wie The Things Network in der Nähe). Einmalige Anschaffung, danach <b>keine SIM-Kosten</b> – ein Gateway versorgt alle Sensoren im Umkreis von einigen Kilometern. Ideal, wenn <b>mehrere Sensoren am selben Gewässer</b> hängen oder der Mobilfunkempfang schwach ist.</p></div>
+      <div class="dec"><span class="code">Faustregel</span><p><b>1–2 Sensoren, guter Handyempfang → NB-IoT.</b> Mehrere Sensoren an einem Gewässer, Funkloch am Ufer oder Strom/Internet im Vereinsheim in Reichweite → <b>LoRaWAN</b>. Der Umschalter oben zeigt euch jeweils die passenden Modellcodes.</p></div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="h-code">
+    <h2 id="h-code">Der Namenscode, entschlüsselt</h2>
+    <p class="sub">Hinter den kryptischen Kürzeln steckt ein einfaches System – am Beispiel WQS:</p>
+    <div class="decoder">
+      <div class="dec"><span class="code">WQS-NB</span><p><b>NB = Batterie.</b> NB-IoT-Gerät mit fest eingebauter Batterie (8.500 mAh, nicht wiederaufladbar). Hält je nach Sendetakt mehrere Jahre, danach Gerätetausch/Service.</p></div>
+      <div class="dec"><span class="code">WQS-NS</span><p><b>NS = Solar.</b> Dasselbe Gerät mit Solarpanel und wiederaufladbarem Akku. Erste Wahl für sonnige Standorte und häufige Messungen.</p></div>
+      <div class="dec"><span class="code">WQS-LB / -LS</span><p><b>Die LoRaWAN-Geschwister.</b> Gleiche Sensorik, aber Funk über ein LoRaWAN-Gateway statt Mobilfunk. <b>LB = Batterie, LS = Solar</b> – das Muster ist bei allen Geräten gleich.</p></div>
+      <div class="dec"><span class="code">…-GE</span><p><b>GE = ohne SIM</b> (nur NB-IoT). Bestellvariante ohne SIM-Karte – ihr nutzt eine eigene NB-IoT-SIM eures Anbieters.</p></div>
+      <div class="dec"><span class="code">…-1T</span><p><b>1T = SIM inklusive</b> (nur NB-IoT). Mit vorinstallierter 1NCE-SIM (10 Jahre Laufzeit, 500 MB) – einschalten, läuft.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    Zusammengestellt aus dem Dragino-Wiki (<a href="https://wiki.dragino.com/docs/NB-IoT/" rel="noopener">NB-IoT</a>,
+    <a href="https://wiki.dragino.com/docs/LoRaWAN-End-Node/" rel="noopener">LoRaWAN</a>)
+    und den Produktseiten (<a href="https://www.dragino.com/products/water-air-quality-sensor/item/346-wqs-nb.html" rel="noopener">WQS-NB</a>,
+    <a href="https://www.dragino.com/products/water-air-quality-sensor/item/345-wqs-lb.html" rel="noopener">WQS-LB</a>,
+    <a href="https://www.dragino.com/products/distance-level-sensor/item/301-dds75-nb.html" rel="noopener">DDS75-NB</a>).
+    Stand: August 2026 · Angaben ohne Gewähr – Messbereiche und Kabellängen vor Bestellung im Wiki prüfen.
+  </footer>
+</div>
+
+<script>
+const MEASURES = {
+  o2:   "Sauerstoff",
+  temp: "Temperatur",
+  ph:   "pH-Wert",
+  ec:   "Leitfähigkeit",
+  turb: "Trübung",
+  level:"Wasserstand",
+  flow: "Durchfluss",
+  orp:  "Redox",
+  sal:  "Salzgehalt",
+  cod:  "CSB"
+};
+// Messwert-Farbklassen wie die Daten-Serien auf limnonetz.de
+const MCLASS = { o2:"m-o2", temp:"m-temp", level:"m-level" };
+
+// kind: base = WQS-Grundgerät, probe = Sonde fürs WQS, device = eigenständiges Gerät
+const ITEMS = [
+  {
+    code:"WQS-NB / WQS-NS", kind:"base", name:"Wasserqualität – das Grundgerät",
+    desc:"Die Zentrale für alle Wasserqualitäts-Sonden: nimmt 1–3 Sonden gleichzeitig auf und funkt die Werte. Einmal kaufen, Sonden nach Bedarf dazustecken.",
+    primary:[], included:[],
+    specs:{ "Sonden":"1–3 gleichzeitig", "Strom":"NB = Batterie · NS = Solar", "Funk":"NB-IoT (Mobilfunk)" },
+    codeLora:"WQS-LB / WQS-LS",
+    specsLora:{ "Sonden":"1–3 gleichzeitig", "Strom":"LB = Batterie · LS = Solar", "Funk":"LoRaWAN (eigenes Gateway)" },
+    note:"Wird immer zusammen mit mindestens einer Sonde bestellt.",
+    search:"wqs grundgerät transmitter konverter zentrale"
+  },
+  {
+    code:"DR-DO1", kind:"probe", name:"Sauerstoff-Sonde",
+    desc:"Gelöster Sauerstoff im Wasser – der wichtigste Frühwarnwert gegen Fischsterben in heißen Sommern.",
+    primary:["o2"], included:["temp"],
+    specs:{ "Messbereich":"0–20 mg/l (O₂)", "Kabel":"5 m (Standard)", "Braucht":"WQS-Grundgerät" },
+    note:"Temperatur wird mitgemessen – kein extra Temperaturfühler nötig.",
+    search:"sauerstoff o2 do fischsterben gelöst"
+  },
+  {
+    code:"DR-DO2", kind:"probe", name:"Sauerstoff-Sonde (optisch)",
+    desc:"Sauerstoffmessung per Fluoreszenz – wartungsärmer, auch für Salz- und Brackwasser geeignet.",
+    primary:["o2"], included:["temp"],
+    specs:{ "Messbereich":"0–20 mg/l (O₂)", "Kabel":"5 m (Standard)", "Braucht":"WQS-Grundgerät" },
+    search:"sauerstoff optisch fluoreszenz salzwasser brackwasser"
+  },
+  {
+    code:"DR-PH01", kind:"probe", name:"pH-Sonde",
+    desc:"Säuregrad des Wassers – wichtig nach Starkregen, bei Algenblüte oder Verdacht auf Einleitungen.",
+    primary:["ph"], included:["temp"],
+    specs:{ "Messbereich":"pH 0–14", "Kabel":"5 m (Standard)", "Braucht":"WQS-Grundgerät" },
+    note:"Temperatur inklusive.",
+    search:"ph säure basisch algen einleitung"
+  },
+  {
+    code:"DR-ECK1.0", kind:"probe", name:"Leitfähigkeits-Sonde (Süßwasser)",
+    desc:"Gelöste Stoffe im Wasser – Ausschläge deuten auf Dünger, Straßenabwasser oder Salz-Eintrag hin.",
+    primary:["ec"], included:["temp"],
+    specs:{ "Messbereich":"0–2.000 µS/cm", "Kabel":"5 m (Standard)", "Braucht":"WQS-Grundgerät" },
+    search:"leitfähigkeit ec dünger nährstoffe abwasser süßwasser"
+  },
+  {
+    code:"DR-ECK10.0", kind:"probe", name:"Leitfähigkeits-Sonde (hoher Bereich)",
+    desc:"Wie die ECK1.0, aber für stark belastete oder salzhaltigere Gewässer.",
+    primary:["ec"], included:["temp"],
+    specs:{ "Messbereich":"10–20.000 µS/cm", "Kabel":"5 m (Standard)", "Braucht":"WQS-Grundgerät" },
+    search:"leitfähigkeit ec hoch belastet"
+  },
+  {
+    code:"DR-EC200", kind:"probe", name:"Leitfähigkeits-Sonde (Salzwasser)",
+    desc:"Für Brack- und Meerwasser – misst zusätzlich den Salzgehalt.",
+    primary:["ec","sal"], included:["temp"],
+    specs:{ "Messbereich":"1–200.000 µS/cm · 0–70 PSU", "Kabel":"5 m (Standard)", "Braucht":"WQS-Grundgerät" },
+    search:"salzgehalt salinität meerwasser brackwasser"
+  },
+  {
+    code:"DR-ORP1", kind:"probe", name:"Redox-Sonde",
+    desc:"Redoxpotential – zeigt, ob im Wasser eher sauerstoffreiche oder faulige Bedingungen herrschen.",
+    primary:["orp"], included:[],
+    specs:{ "Messbereich":"−1999 bis +1999 mV", "Kabel":"5 m (Standard)", "Braucht":"WQS-Grundgerät" },
+    search:"redox orp faulschlamm"
+  },
+  {
+    code:"DR-TS200", kind:"probe", name:"Trübungs-Sonde",
+    desc:"Wie klar ist das Wasser? Schlägt nach Starkregen, Bauarbeiten oder Algenblüte aus.",
+    primary:["turb"], included:["temp"],
+    specs:{ "Messbereich":"0–200 NTU", "Kabel":"5 m (Standard)", "Braucht":"WQS-Grundgerät" },
+    search:"trübung klar sediment starkregen ntu"
+  },
+  {
+    code:"DR-TS4000", kind:"probe", name:"Trübungs-Sonde (hoher Bereich)",
+    desc:"Für sehr trübe Gewässer und Ereignisse mit viel Schwebstoff.",
+    primary:["turb"], included:["temp"],
+    specs:{ "Messbereich":"0–4.000 NTU", "Kabel":"5 m (Standard)", "Braucht":"WQS-Grundgerät" },
+    search:"trübung stark schwebstoffe ntu"
+  },
+  {
+    code:"DR-COD", kind:"probe", name:"CSB-Sonde (organische Belastung)",
+    desc:"Chemischer Sauerstoffbedarf – Maß für organische Verschmutzung, z. B. bei Gülle- oder Abwasser-Verdacht.",
+    primary:["cod"], included:["turb"],
+    specs:{ "Messbereich":"0–500 mg/l", "Kabel":"5 m (Standard)", "Braucht":"WQS-Grundgerät" },
+    search:"csb cod organisch gülle abwasser belastung"
+  },
+  {
+    code:"D20 / D22 / D23-NB", kind:"device", name:"Temperaturfühler (1–3 Tiefen)",
+    desc:"Eigenständiges Gerät mit wasserdichten Temperaturfühlern: D20 = 1 Fühler, D22 = 2, D23 = 3 – ideal für ein Temperaturprofil in mehreren Tiefen.",
+    primary:["temp"], included:[],
+    specs:{ "Messbereich":"−55 bis +125 °C", "Kabel":"1,5 m je Fühler", "Strom":"Batterie (8.500 mAh)" },
+    codeLora:"D20 / D22 / D23-LB",
+    specsLora:{ "Messbereich":"−55 bis +125 °C", "Kabel":"1,5 m je Fühler", "Strom":"Batterie (8.500 mAh)" },
+    note:"Nur sinnvoll, wenn ihr ausschließlich Temperatur wollt – O₂-, pH- und EC-Sonden liefern Temperatur ohnehin mit.",
+    search:"temperatur fühler ds18b20 tiefe profil d20 d22 d23"
+  },
+  {
+    code:"PS-NB / PS-NS", kind:"device", name:"Pegel per Drucksonde",
+    desc:"Tauchsonde aus Edelstahl liegt am Grund und misst den Wasserstand über den Druck – unauffällig, frostsicher unter Wasser, auch für tiefe Weiher.",
+    primary:["level"], included:[],
+    specs:{ "Messbereich":"nach Wunsch, bis 100 m", "Kabel":"= Messtiefe, bei Bestellung angeben", "Strom":"NB = Batterie · NS = Solar" },
+    codeLora:"PS-LB / PS-LS",
+    specsLora:{ "Messbereich":"nach Wunsch, bis 100 m", "Kabel":"= Messtiefe, bei Bestellung angeben", "Strom":"LB = Batterie · LS = Solar" },
+    note:"Wichtig: Kabellänge passend zur Wassertiefe mitbestellen.",
+    search:"pegel wasserstand druck tauchsonde tiefe weiher"
+  },
+  {
+    code:"DDS75-NB", kind:"device", name:"Pegel per Ultraschall",
+    desc:"Misst von oben (Steg, Brücke, Rohr) den Abstand zur Wasseroberfläche – ganz ohne Wasserkontakt, dadurch wartungsarm.",
+    primary:["level"], included:[],
+    specs:{ "Messbereich":"0,28–7,5 m Abstand", "Kabel":"keins – Montage über Wasser", "Strom":"Batterie (8.500 mAh)" },
+    codeLora:"DDS75-LB / DDS75-LS",
+    specsLora:{ "Messbereich":"0,28–7,5 m Abstand", "Kabel":"keins – Montage über Wasser", "Strom":"LB = Batterie · LS = Solar" },
+    note:"Braucht einen festen Montagepunkt über der Wasseroberfläche.",
+    search:"pegel ultraschall abstand steg brücke berührungslos"
+  },
+  {
+    code:"SW3L-NB", kind:"device", name:"Durchfluss am Rohr",
+    desc:"Misst, wie viel Wasser durch ein Rohr läuft – z. B. Zulauf, Ablauf oder Quellschüttung. Vier Rohrgrößen von ½″ bis 2″.",
+    primary:["flow"], included:[],
+    specs:{ "Varianten":"DN15 / DN20 / DN25 / DN50", "Einbau":"in die Rohrleitung", "Strom":"Batterie (8.500 mAh)" },
+    codeLora:"SW3L-LB / SW3L-LS",
+    specsLora:{ "Varianten":"DN15 / DN20 / DN25 / DN50", "Einbau":"in die Rohrleitung", "Strom":"LB = Batterie · LS = Solar" },
+    search:"durchfluss zulauf ablauf quelle rohr liter"
+  }
+];
+
+const KIND_LABEL = { base:"WQS-System · Grundgerät", probe:"WQS-System · Sonde", device:"Eigenständiges Gerät" };
+const PROBE_COVER = new Set(ITEMS.filter(i=>i.kind==="probe").flatMap(i=>[...i.primary,...i.included]));
+
+const state = { q:"", active:new Set(), radio:"nb" };
+const RADIO_HINT = {
+  nb:  "NB-IoT funkt übers Mobilfunknetz – jedes Gerät braucht eine SIM, dafür kein eigenes Gateway.",
+  lora:"LoRaWAN funkt zu einem eigenen Gateway am Gewässer – keine SIM-Kosten, ein Gateway versorgt alle Sensoren."
+};
+const $grid = document.getElementById("grid");
+const $chips = document.getElementById("chips");
+const $count = document.getElementById("count");
+const $combo = document.getElementById("combo");
+const $q = document.getElementById("q");
+
+// Chips bauen
+for(const [key,label] of Object.entries(MEASURES)){
+  const b = document.createElement("button");
+  b.className="chip"; b.textContent=label; b.dataset.m=key;
+  b.setAttribute("aria-pressed","false");
+  b.addEventListener("click",()=>{ toggle(key); });
+  $chips.appendChild(b);
+}
+const reset = document.createElement("button");
+reset.className="chip reset"; reset.textContent="Filter zurücksetzen";
+reset.addEventListener("click",()=>{ state.active.clear(); state.q=""; $q.value=""; render(); });
+$chips.appendChild(reset);
+
+function toggle(key){
+  state.active.has(key) ? state.active.delete(key) : state.active.add(key);
+  render();
+}
+
+// Szenario-Buttons
+document.querySelectorAll(".scenario").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    state.active = new Set(btn.dataset.set.split(","));
+    state.q=""; $q.value="";
+    render();
+    document.getElementById("toolbar").scrollIntoView({behavior:"smooth",block:"start"});
+  });
+});
+
+$q.addEventListener("input",()=>{ state.q=$q.value.trim().toLowerCase(); render(); });
+
+// Funkweg-Umschalter
+document.querySelectorAll(".seg-btn").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    state.radio = btn.dataset.radio;
+    document.querySelectorAll(".seg-btn").forEach(b=>
+      b.setAttribute("aria-pressed", b.dataset.radio===state.radio ? "true":"false"));
+    document.getElementById("seghint").textContent = RADIO_HINT[state.radio];
+    render();
+  });
+});
+
+function matches(item){
+  const all=[...item.primary,...item.included];
+  const fOK = state.active.size===0 || [...state.active].some(m=>all.includes(m))
+           || (item.kind==="base" && [...state.active].some(m=>PROBE_COVER.has(m)));
+  if(!fOK) return false;
+  if(!state.q) return true;
+  const hay=(item.code+" "+(item.codeLora||"")+" "+item.name+" "+item.desc+" "+item.search+" "
+    +all.map(m=>MEASURES[m]).join(" ")).toLowerCase();
+  return state.q.split(/\s+/).every(w=>hay.includes(w));
+}
+
+function badgeCls(m,inkl){
+  return "badge"+(MCLASS[m]?" "+MCLASS[m]:"")+(inkl?" inkl":"")+(state.active.has(m)?" hit":"");
+}
+
+function card(item){
+  const el=document.createElement("article");
+  el.className="card";
+  const badges=[
+    ...item.primary.map(m=>`<span class="${badgeCls(m,false)}">${MEASURES[m]}</span>`),
+    ...item.included.map(m=>`<span class="${badgeCls(m,true)}">${MEASURES[m]} inkl.</span>`)
+  ].join("");
+  const lora = state.radio==="lora";
+  const code = lora && item.codeLora ? item.codeLora : item.code;
+  const specsSrc = lora && item.specsLora ? item.specsLora : item.specs;
+  const specs=Object.entries(specsSrc).map(([k,v])=>`<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+  el.innerHTML=`
+    <span class="kind${item.kind==="base"?" base":""}">${KIND_LABEL[item.kind]}</span>
+    <div><span class="code">${code}</span></div>
+    <h3>${item.name}</h3>
+    <p class="desc">${item.desc}</p>
+    ${badges?`<div class="badges">${badges}</div>`:""}
+    <dl class="specs">${specs}</dl>
+    ${item.note?`<div class="note">${item.note}</div>`:""}`;
+  return el;
+}
+
+function render(){
+  $chips.querySelectorAll(".chip[data-m]").forEach(c=>{
+    c.setAttribute("aria-pressed", state.active.has(c.dataset.m) ? "true":"false");
+  });
+  $grid.textContent="";
+  const shown=ITEMS.filter(matches);
+  shown.forEach(i=>$grid.appendChild(card(i)));
+  $count.textContent = state.active.size||state.q
+    ? `${shown.length} von ${ITEMS.length} Einträgen passen zur Auswahl.`
+    : `${ITEMS.length} Einträge – wählt oben aus, was ihr messen wollt.`;
+  const sel=[...state.active];
+  if(sel.length>=2 && sel.every(m=>PROBE_COVER.has(m))){
+    $combo.innerHTML=`<b>Spartipp:</b> Alle gewählten Werte (${sel.map(m=>MEASURES[m]).join(", ")})
+      lassen sich mit <b>einem</b> WQS-Grundgerät und passenden Sonden abdecken – bis zu drei Sonden pro Gerät.`;
+    $combo.classList.add("show");
+  } else {
+    $combo.classList.remove("show");
+  }
+}
+render();
+</script>
+
+</body>
+</html>
