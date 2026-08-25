@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LimnoNetz Sensorfinder</title>
-<meta name="description" content="Welcher Sensor passt zu eurem Gewässer? Auswahlhilfe für Dragino-Wassersensoren (NB-IoT und LoRaWAN), aus dem Technik-Wiki für Vereine übersetzt.">
+<title>Sensorfinder — welcher Sensor passt zu eurem Gewässer? · LimnoNetz</title>
+<meta name="description" content="In wenigen Klicks zur Bestellliste: Auswahlhilfe für Dragino-Wassersensoren (NB-IoT und LoRaWAN) — von LimnoNetz, dem kostenlosen Gewässermonitoring für Vereine.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3.33C10.84 5.48 7.13 9.07 5.75 12.78 4.2 17 7.38 20.63 12 20.63c4.61 0 7.81-3.63 6.25-7.85C16.87 9.07 13.16 5.48 12 3.33Z' fill='none' stroke='%232a6f5f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='m7.6 15.2 3.1-3.2 2.9 3.2 2.7-3.2' fill='none' stroke='%232a6f5f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@500;600&display=swap">
 <style>
@@ -94,7 +94,10 @@
   .brand{
     display:inline-flex;align-items:center;gap:9px;
     font-weight:700;font-size:1.22rem;color:var(--ink);letter-spacing:-.01em;
+    text-decoration:none;
   }
+  .brand:hover{color:var(--accent)}
+  .brand:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
   .brand svg{width:27px;height:27px;color:var(--accent);flex-shrink:0}
   .brandbar .app{
     margin-left:auto;font-size:.85rem;font-weight:600;color:var(--muted);
@@ -116,6 +119,8 @@
   }
   .lede{max-width:62ch;color:var(--muted);font-size:1.08rem;margin:0 0 8px}
   .lede strong{color:var(--ink)}
+  .lede a{color:var(--accent);font-weight:600;text-decoration:none}
+  .lede a:hover{text-decoration:underline}
   h2{
     font-weight:700;font-size:1.3rem;
     letter-spacing:-.01em;margin:0 0 6px;text-wrap:balance;
@@ -249,6 +254,28 @@
   .dec p{margin:6px 0 0;font-size:.92rem;color:var(--muted)}
   .dec p b{color:var(--ink)}
 
+  /* CTA zu limnonetz.de */
+  .cta{
+    margin-top:52px;
+    background:var(--accent-soft);border:1px solid var(--accent);
+    border-radius:var(--radius);padding:26px 28px;box-shadow:var(--shadow-raised);
+    display:flex;flex-wrap:wrap;gap:18px 32px;align-items:center;justify-content:space-between;
+  }
+  .cta h2{margin-bottom:6px}
+  .cta p{margin:0;color:var(--muted);max-width:58ch}
+  .cta p strong{color:var(--ink)}
+  .cta-actions{display:flex;flex-wrap:wrap;gap:10px;flex-shrink:0}
+  .btn-solid,.btn-ghost{
+    font:inherit;font-weight:650;text-decoration:none;
+    border-radius:var(--radius-sm);padding:10px 18px;
+    display:inline-flex;align-items:center;gap:8px;white-space:nowrap;
+  }
+  .btn-solid{background:var(--accent);color:var(--surface);border:1px solid var(--accent)}
+  .btn-solid:hover{background:var(--accent-ink);border-color:var(--accent-ink)}
+  .btn-ghost{background:transparent;color:var(--accent-ink);border:1px solid var(--accent)}
+  .btn-ghost:hover{background:var(--surface)}
+  .btn-solid:focus-visible,.btn-ghost:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
   footer{
     margin-top:56px;border-top:1px solid var(--line);padding-top:18px;
     font-size:.87rem;color:var(--muted);
@@ -265,25 +292,28 @@
 
 <div class="brandbar">
   <div class="inner">
-    <span class="brand">
+    <a class="brand" href="https://limnonetz.de/" title="Zur LimnoNetz-Startseite">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M12 3.33C10.84 5.48 7.13 9.07 5.75 12.78 4.2 17 7.38 20.63 12 20.63c4.61 0 7.81-3.63 6.25-7.85C16.87 9.07 13.16 5.48 12 3.33Z"/>
         <path d="m7.6 15.2 3.1-3.2 2.9 3.2 2.7-3.2"/>
       </svg>
       LimnoNetz
-    </span>
+    </a>
     <span class="app">Sensorfinder</span>
   </div>
 </div>
 
 <div class="wrap">
   <header class="hero">
-    <div class="eyebrow">Auswahlhilfe · NB-IoT</div>
+    <div class="eyebrow">Auswahlhilfe · NB-IoT &amp; LoRaWAN</div>
     <h1>Welcher Sensor passt zu eurem Gewässer?</h1>
-    <p class="lede">Die Dragino-Übersicht ist für Techniker geschrieben – diese Seite übersetzt sie für Vereine.
+    <p class="lede">Die Dragino-Übersicht ist für Techniker geschrieben – diese Seite übersetzt sie für Vereine
+    und macht aus „Wir sollten mal messen“ in drei Klicks eine konkrete Bestellliste.
     Wählt aus, <strong>was ihr messen wollt</strong>, und ihr seht sofort die passenden Geräte,
     welche Werte sie <strong>gratis mitliefern</strong> und wie lang die Kabel sind – wahlweise als
     <strong>NB-IoT-</strong> oder <strong>LoRaWAN-Variante</strong>, die Sensorik ist baugleich.</p>
+    <p class="lede">Und wenn der Sensor gefunden ist: Im <a href="https://limnonetz.de/">LimnoNetz</a> werden
+    aus seinen Daten Kurven, Karten und Hinweise – <strong>kostenlos für Vereine</strong>.</p>
   </header>
 
   <section class="sec" aria-labelledby="h-szenarien">
@@ -346,7 +376,22 @@
     </div>
   </section>
 
+  <section class="sec cta" aria-labelledby="h-cta">
+    <div>
+      <h2 id="h-cta">Sensor gefunden? Der Rest ist LimnoNetz.</h2>
+      <p>Aufstellen, anmelden, messen: LimnoNetz macht aus den Funkdaten eures Sensors verständliche
+      Kurven, zeigt eure Stationen auf der Karte und meldet sich, bevor es am Gewässer kritisch wird.
+      <strong>Herstellerneutral und für Vereine kostenlos</strong> – ihr kauft nur die Hardware.</p>
+    </div>
+    <div class="cta-actions">
+      <a class="btn-solid" href="https://limnonetz.de/">LimnoNetz kennenlernen</a>
+      <a class="btn-ghost" href="mailto:info@limnonetz.de?subject=Interesse%20am%20LimnoNetz">Als Verein melden</a>
+    </div>
+  </section>
+
   <footer>
+    Ein Werkzeug aus dem <a href="https://limnonetz.de/">LimnoNetz</a>-Projekt – dem offenen Messnetz
+    für kleine Gewässer.<br>
     Zusammengestellt aus dem Dragino-Wiki (<a href="https://wiki.dragino.com/docs/NB-IoT/" rel="noopener">NB-IoT</a>,
     <a href="https://wiki.dragino.com/docs/LoRaWAN-End-Node/" rel="noopener">LoRaWAN</a>)
     und den Produktseiten (<a href="https://www.dragino.com/products/water-air-quality-sensor/item/346-wqs-nb.html" rel="noopener">WQS-NB</a>,
