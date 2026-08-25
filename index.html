@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Daniel Altiparmak — Projekte</title>
+  <meta name="description" content="Projekte von Daniel Altiparmak (altipard)." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%23bcd9e2'/%3E%3Ccircle cx='8' cy='8' r='6' fill='none' stroke='%232e6a80' stroke-width='1.4'/%3E%3Cpath d='M4.8 8.6c1.1-1 2.1-1 3.2 0s2.1 1 3.2 0' fill='none' stroke='%232e6a80' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <style>
+    :root {
+      --papier: #f3efe3;
+      --papier-hell: #faf7ee;
+      --tusche: #2b2a23;
+      --tusche-dim: #6e6450;
+      --wasser: #2e6a80;
+      --wasser-tief: #1f4d5e;
+      --linie: rgba(43, 42, 35, 0.35);
+      --linie-fein: rgba(43, 42, 35, 0.18);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: var(--papier);
+      color: var(--tusche);
+      font-family: ui-serif, Georgia, "Times New Roman", serif;
+      line-height: 1.5;
+    }
+
+    ::selection { background: #bcd9e2; color: var(--wasser-tief); }
+
+    main {
+      width: 100%;
+      max-width: 560px;
+      background: var(--papier-hell);
+      border: 1px solid var(--tusche);
+      box-shadow: 0 0 0 4px var(--papier-hell), 0 0 0 5px var(--linie), 3px 6px 20px rgba(43, 42, 35, 0.18);
+      padding: 36px 40px 32px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.9rem;
+      font-style: italic;
+      font-weight: 500;
+      color: var(--wasser-tief);
+      letter-spacing: 0.01em;
+    }
+
+    .handle {
+      margin: 4px 0 0;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--tusche-dim);
+    }
+
+    .wellen { display: block; margin: 14px 0 26px; color: var(--wasser); }
+
+    h2 {
+      margin: 0 0 12px;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--tusche-dim);
+    }
+
+    .projekt {
+      display: block;
+      padding: 16px 18px;
+      border: 1px solid var(--linie);
+      background: var(--papier);
+      color: inherit;
+      text-decoration: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .projekt:hover, .projekt:focus-visible {
+      border-color: var(--wasser);
+      box-shadow: inset 0 0 0 1px var(--wasser);
+      outline: none;
+    }
+
+    .projekt strong {
+      font-size: 1.15rem;
+      font-style: italic;
+      font-weight: 500;
+      color: var(--wasser-tief);
+    }
+
+    .projekt p { margin: 4px 0 0; font-size: 0.92rem; color: var(--tusche-dim); }
+
+    .projekt .meta {
+      margin-top: 8px;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--wasser);
+    }
+
+    footer {
+      margin-top: 26px;
+      padding-top: 14px;
+      border-top: 1px solid var(--linie-fein);
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: 0.78rem;
+      color: var(--tusche-dim);
+    }
+
+    footer a { color: var(--wasser-tief); text-underline-offset: 3px; text-decoration-color: var(--linie); }
+    footer a:hover { text-decoration-color: var(--wasser); }
+
+    @media (max-width: 480px) {
+      main { padding: 26px 22px 24px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Daniel Altiparmak</h1>
+    <p class="handle">github.com/altipard</p>
+    <svg class="wellen" width="150" height="12" viewBox="0 0 150 12" aria-hidden="true">
+      <path d="M2 4c12-4 24-4 36 0s24 4 36 0 24-4 36 0 24 4 36 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      <path d="M12 9c10-3 21-3 31 0s21 3 31 0 21-3 31 0 21 3 31 0" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.5" />
+    </svg>
+
+    <h2>Projekte</h2>
+    <a class="projekt" href="https://altipard.github.io/seensucht/">
+      <strong>Seensucht</strong>
+      <p>Oberschwäbische Seen &amp; Weiher — endlich auf einer Karte. Kartenportal im Stil amtlicher Wanderkarten, mit Trophie-Daten des Seenprogramms.</p>
+      <span class="meta">Karte öffnen →</span>
+    </a>
+
+    <footer>
+      Quellcode auf <a href="https://github.com/altipard">GitHub</a>
+    </footer>
+  </main>
+</body>
+</html>
