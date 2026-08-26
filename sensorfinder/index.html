@@ -126,6 +126,7 @@
     letter-spacing:-.01em;margin:0 0 6px;text-wrap:balance;
   }
   .sec{margin-top:44px}
+  .sec,.sec > h2[id]{scroll-margin-top:calc(var(--toolbar-h, 200px) + 16px)}
   .sec > p.sub{color:var(--muted);margin:0 0 18px;max-width:70ch}
 
   /* Szenarien */
@@ -170,6 +171,8 @@
   .seg-btn[aria-pressed="true"]{background:var(--accent);color:var(--surface)}
   .seg-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .seg-hint{font-size:.85rem;color:var(--muted);flex-basis:100%;margin-top:2px}
+  .seg-hint a{color:var(--accent);font-weight:600;text-decoration:none;white-space:nowrap}
+  .seg-hint a:hover{text-decoration:underline}
   .chips{display:flex;flex-wrap:wrap;gap:8px}
   .chip{
     font:inherit;font-size:.92rem;font-weight:600;cursor:pointer;
@@ -254,6 +257,69 @@
   .dec p{margin:6px 0 0;font-size:.92rem;color:var(--muted)}
   .dec p b{color:var(--ink)}
 
+  /* Funkweg-Vergleich */
+  .versus{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px;margin-top:18px}
+  .vs{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:11px;
+  }
+  .vs-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .vs-head .tag{font-size:.8rem;font-weight:600;color:var(--muted)}
+  .vs p.claim{margin:0;font-size:.95rem;color:var(--muted)}
+  .vs p.claim b{color:var(--ink)}
+  .vs ul{list-style:none;margin:0;padding:0;display:grid;gap:9px;font-size:.9rem;color:var(--muted)}
+  .vs li{position:relative;padding-left:27px}
+  .vs li::before{
+    content:"+";position:absolute;left:0;top:3px;
+    width:18px;height:18px;border-radius:50%;
+    display:grid;place-items:center;font-size:.82rem;font-weight:700;line-height:1;
+    background:var(--ok-soft);color:var(--ok);
+  }
+  .vs li.con::before{content:"\2013";background:var(--s-temp-soft);color:var(--s-temp)}
+  .vs li b{color:var(--ink)}
+
+  /* Vergleichstabelle */
+  .tablewrap{
+    overflow-x:auto;margin-top:18px;background:var(--surface);
+    border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+  }
+  table.cmp{border-collapse:collapse;width:100%;min-width:560px;font-size:.9rem}
+  table.cmp th,table.cmp td{text-align:left;padding:11px 15px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.cmp thead th{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+  table.cmp tbody th{font-weight:600;color:var(--muted);width:1%;white-space:nowrap}
+  table.cmp tbody td small{display:block;color:var(--muted);font-size:.84rem;margin-top:3px;line-height:1.4}
+  table.cmp tbody tr:last-child th,table.cmp tbody tr:last-child td{border-bottom:0}
+
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  /* Sprungmarken */
+  .jump{
+    display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+    margin-top:22px;padding-top:18px;border-top:1px solid var(--line);
+  }
+  .jump .jump-label{
+    font-weight:600;font-size:.74rem;letter-spacing:.11em;
+    text-transform:uppercase;color:var(--muted);margin-right:4px;
+  }
+  .jump a{
+    display:inline-flex;align-items:center;gap:7px;
+    font-size:.9rem;font-weight:600;text-decoration:none;
+    background:var(--accent-soft);color:var(--accent-ink);
+    border-radius:999px;padding:6px 15px;
+    transition:background .12s,color .12s;
+  }
+  .jump a::before{content:"\2193";font-size:.85em;opacity:.6}
+  .jump a:hover{background:var(--accent);color:var(--surface)}
+  .jump a:hover::before{opacity:1}
+  .jump a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .totop{display:inline-block;margin-top:14px;font-weight:600}
+
+  /* Callout-Varianten */
+  .callout.tip{border-left-color:var(--accent)}
+  .callout ul{margin:8px 0 0;padding-left:1.15em;font-size:.94rem;color:var(--muted)}
+  .callout li{margin:4px 0}
+  .callout li strong{color:var(--ink)}
+
   /* CTA zu limnonetz.de */
   .cta{
     margin-top:52px;
@@ -283,7 +349,7 @@
   footer a{color:var(--accent);text-decoration:none}
   footer a:hover{text-decoration:underline}
   @media (prefers-reduced-motion: reduce){
-    .scenario,.chip{transition:none}
+    .scenario,.chip,.jump a{transition:none}
     .scenario:hover{transform:none}
   }
 </style>
@@ -314,6 +380,14 @@
     <strong>NB-IoT-</strong> oder <strong>LoRaWAN-Variante</strong>, die Sensorik ist baugleich.</p>
     <p class="lede">Und wenn der Sensor gefunden ist: Im <a href="https://limnonetz.de/">LimnoNetz</a> werden
     aus seinen Daten Kurven, Karten und Hinweise – <strong>kostenlos für Vereine</strong>.</p>
+
+    <nav class="jump" aria-label="Abschnitte dieser Seite">
+      <span class="jump-label">Auf dieser Seite</span>
+      <a href="#h-szenarien">Vereinsfragen</a>
+      <a href="#h-ergebnisse">Sensorliste</a>
+      <a href="#h-funk">NB-IoT oder LoRaWAN</a>
+      <a href="#h-code">Namenscode</a>
+    </nav>
   </header>
 
   <section class="sec" aria-labelledby="h-szenarien">
@@ -335,7 +409,7 @@
         <button class="seg-btn" data-radio="lora" aria-pressed="false">LoRaWAN · Gateway</button>
       </div>
       <input id="q" type="search" placeholder="Suchen … z. B. Sauerstoff, WQS, Pegel, Kabel" aria-label="Sensoren durchsuchen">
-      <span class="seg-hint" id="seghint">NB-IoT funkt übers Mobilfunknetz – jedes Gerät braucht eine SIM, dafür kein eigenes Gateway.</span>
+      <span class="seg-hint"><span id="seghint">NB-IoT funkt übers Mobilfunknetz – jedes Gerät braucht eine SIM, dafür kein eigenes Gateway.</span> <a href="#h-funk">Unterschied im Detail &rarr;</a></span>
     </div>
     <div class="chips" id="chips" role="group" aria-label="Nach Messwert filtern"></div>
     <div class="combo" id="combo"></div>
@@ -343,6 +417,7 @@
   </div>
 
   <section class="sec" aria-labelledby="h-ergebnisse" style="margin-top:18px">
+    <h2 id="h-ergebnisse" class="sr-only">Passende Geräte</h2>
     <div class="grid" id="grid"></div>
   </section>
 
@@ -356,12 +431,144 @@
 
   <section class="sec" aria-labelledby="h-funk">
     <h2 id="h-funk">NB-IoT oder LoRaWAN – was passt zu euch?</h2>
-    <p class="sub">Beide Wege liefern dieselben Messwerte; der Unterschied ist, wie die Daten vom Ufer ins Internet kommen.</p>
-    <div class="decoder">
-      <div class="dec"><span class="code">NB-IoT</span><p><b>Funkt übers Mobilfunknetz.</b> Jedes Gerät braucht eine SIM-Karte (laufende Kosten, z. B. 1NCE), dafür kein eigenes Gateway. Ideal für <b>einzelne, verstreute Standorte</b> – vorausgesetzt, am Gewässer gibt es Mobilfunkempfang.</p></div>
-      <div class="dec"><span class="code">LoRaWAN</span><p><b>Funkt zu einem eigenen Gateway</b> (oder einem Community-Netz wie The Things Network in der Nähe). Einmalige Anschaffung, danach <b>keine SIM-Kosten</b> – ein Gateway versorgt alle Sensoren im Umkreis von einigen Kilometern. Ideal, wenn <b>mehrere Sensoren am selben Gewässer</b> hängen oder der Mobilfunkempfang schwach ist.</p></div>
-      <div class="dec"><span class="code">Faustregel</span><p><b>1–2 Sensoren, guter Handyempfang → NB-IoT.</b> Mehrere Sensoren an einem Gewässer, Funkloch am Ufer oder Strom/Internet im Vereinsheim in Reichweite → <b>LoRaWAN</b>. Der Umschalter oben zeigt euch jeweils die passenden Modellcodes.</p></div>
+    <p class="sub">Beide Wege liefern dieselben Messwerte; der Unterschied ist, wie die Daten vom Ufer ins Internet
+      kommen. Das ist die eine Entscheidung, die vorab fallen muss – die ganze Bestellliste hängt daran.</p>
+
+    <div class="versus">
+      <div class="vs">
+        <div class="vs-head"><span class="code">NB-IoT</span><span class="tag">Mobilfunk &middot; SIM-Karte</span></div>
+        <p class="claim"><b>Nutzt die vorhandenen Mobilfunkmasten</b>, aber auf einem eigenen, schmalen Kanal
+          (180&nbsp;kHz): Die Sendeleistung wird gebündelt statt über einen breiten Kanal verteilt, und jede Nachricht
+          darf beliebig oft wiederholt werden, bis sie ankommt.</p>
+        <ul>
+          <li><b>Rund 20&nbsp;dB mehr Reserve als das normale Handynetz</b> – das entspricht der hundertfachen
+            Signaldämpfung, die noch verkraftet wird. Wo ein Telefonat abbricht oder das Handy „kein Netz“ zeigt,
+            kommt ein NB-IoT-Sensor in der Regel noch durch.</li>
+          <li><b>Keine eigene Infrastruktur.</b> Sensor aufhängen, einschalten, fertig – kein Gateway, kein Strom,
+            kein Internetanschluss am Gewässer.</li>
+          <li><b>Entfernung zwischen den Standorten egal.</b> Ob 2&nbsp;km oder 50&nbsp;km auseinander spielt keine
+            Rolle, jedes Gerät hängt für sich am Netz.</li>
+          <li><b>Planbare Kosten.</b> 1NCE-SIM: rund 10&nbsp;€ für 500&nbsp;MB und 10&nbsp;Jahre Laufzeit – pro
+            Sensor, einmal bezahlt.</li>
+          <li class="con"><b>Sehr langsam.</b> Wenige kbit/s, kein Livebild, keine Kamera. Für ein paar hundert Byte
+            Messwerte je Sendung reicht das mühelos – für alles andere nicht.</li>
+          <li class="con"><b>Braucht NB-IoT-Ausbau in der Region.</b> Ohne Netz hilft auch das beste Funkbudget
+            nichts – deshalb vorher prüfen (siehe unten).</li>
+          <li class="con"><b>Schwacher Empfang kostet Batterie.</b> Bei schlechtem Signal wiederholt das Modem die
+            Sendung häufiger. An solchen Standorten die Solar-Variante <span class="code">-NS</span> nehmen.</li>
+        </ul>
+      </div>
+
+      <div class="vs">
+        <div class="vs-head"><span class="code">LoRaWAN</span><span class="tag">eigenes Gateway &middot; 868&nbsp;MHz</span></div>
+        <p class="claim"><b>Funkt lizenzfrei auf 868&nbsp;MHz zu einem Gateway</b>, das ihr selbst aufstellt – oder zu
+          einem Community-Gateway (The Things Network), falls eines in Reichweite steht.</p>
+        <ul>
+          <li><b>Große Reichweite bei freier Sicht.</b> Von einem erhöhten Standort aus sind 20–40&nbsp;km realistisch;
+            von exponierten Berglagen sind Verbindungen weit darüber hinaus dokumentiert.</li>
+          <li><b>Keine laufenden Kosten pro Sensor.</b> Das Gateway ist eine einmalige Anschaffung, jeder weitere
+            Sensor im Umkreis kostet nichts extra.</li>
+          <li><b>Sparsam.</b> Eine LoRa-Sendung braucht weniger Energie als ein Mobilfunk-Verbindungsaufbau – gut für
+            lange Batterielaufzeiten.</li>
+          <li><b>Unabhängig vom Mobilfunkausbau.</b> Ihr betreibt euer eigenes Netz.</li>
+          <li class="con"><b>Die Reichweite lebt von der Sichtlinie.</b> Hügel, Wald und Bebauung drücken die
+            40&nbsp;km schnell auf 2–5&nbsp;km. Die großen Zahlen gelten für freie Sicht, nicht für Luftlinie durch
+            den Berg.</li>
+          <li class="con"><b>Das Gateway braucht Strom <i>und</i> Internet.</b> Genau daran scheitert es an
+            abgelegenen Gewässern – irgendwo muss der Weg ins Internet hergestellt werden.</li>
+          <li class="con"><b>Weit verstreute Gewässer = mehrere Gateways.</b> Jedes mit Standort, Strom, Anbindung
+            und Wartung.</li>
+          <li class="con"><b>Sendezeit ist begrenzt.</b> Im 868-MHz-Band gilt eine Duty-Cycle-Grenze von 1&nbsp;% –
+            gut für Messwerte im Viertelstundentakt, nicht für Sekundentakt.</li>
+        </ul>
+      </div>
     </div>
+
+    <div class="tablewrap">
+      <table class="cmp">
+        <thead>
+          <tr><th scope="col"><span class="sr-only">Kriterium</span></th><th scope="col">NB-IoT</th><th scope="col">LoRaWAN</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Netzbetreiber</th>
+            <td>Mobilfunkanbieter<small>bestehende Masten</small></td>
+            <td>ihr selbst oder die TTN-Community<small>eigenes Gateway</small></td>
+          </tr>
+          <tr>
+            <th scope="row">Reichweite</th>
+            <td>überall, wo NB-IoT ausgebaut ist<small>Standorte beliebig weit auseinander</small></td>
+            <td>2–5&nbsp;km bebaut oder bewaldet, 20–40&nbsp;km bei freier Sicht<small>alle Sensoren rund um ein Gateway</small></td>
+          </tr>
+          <tr>
+            <th scope="row">Vor Ort nötig</th>
+            <td>nichts<small>nur der Sensor</small></td>
+            <td>Gateway mit Strom und Internet<small>z.&nbsp;B. Vereinsheim, Hütte, Mast</small></td>
+          </tr>
+          <tr>
+            <th scope="row">Laufende Kosten</th>
+            <td>SIM je Sensor<small>1NCE: ca. 10&nbsp;€ / 500&nbsp;MB / 10&nbsp;Jahre</small></td>
+            <td>keine je Sensor<small>Gateway einmalig, dessen Internetanschluss läuft mit</small></td>
+          </tr>
+          <tr>
+            <th scope="row">Datenrate</th>
+            <td>wenige kbit/s<small>reicht für Messwerte</small></td>
+            <td>0,25–5,5&nbsp;kbit/s<small>reicht für Messwerte</small></td>
+          </tr>
+          <tr>
+            <th scope="row">Sendetakt</th>
+            <td>frei wählbar<small>die Batterie ist die Grenze</small></td>
+            <td>durch Duty Cycle begrenzt<small>typisch alle 15–60&nbsp;Minuten</small></td>
+          </tr>
+          <tr>
+            <th scope="row">Wartung</th>
+            <td>nur die Sensoren<small>Netz betreibt jemand anderes</small></td>
+            <td>Sensoren <i>und</i> Gateway<small>Stromausfall am Gateway = alle Sensoren offline</small></td>
+          </tr>
+          <tr>
+            <th scope="row">Passt, wenn …</th>
+            <td>die Gewässer verstreut liegen und niemand ein Gateway betreuen möchte</td>
+            <td>mehrere Sensoren an einem Gewässer hängen und Strom&nbsp;+&nbsp;Internet in Reichweite sind</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout tip">
+      <h2>Faustregel für Vereine</h2>
+      <p><strong>Verstreute Gewässer, niemand mit Technik-Zeit → NB-IoT.</strong> Schlechter Handyempfang ist dabei
+        kein Ausschlusskriterium: NB-IoT funkt genau dort noch, wo ein Telefonat abbricht.
+        <strong>Mehrere Sensoren an einem Gewässer, dazu ein Vereinsheim mit Strom und Internet in Sichtweite →
+        LoRaWAN.</strong></p>
+      <ul>
+        <li><strong>Beispiel:</strong> fünf Gewässer, bis zu 25&nbsp;km auseinander, an einem davon schlechter
+          Handyempfang → <strong>NB-IoT</strong>. LoRaWAN bräuchte hier mehrere Gateways, jedes mit Standort, Strom
+          und Internetanschluss.</li>
+        <li><strong>Gegenbeispiel:</strong> drei Sensoren in einer Teichanlage hinter dem Vereinsheim →
+          <strong>LoRaWAN</strong>. Ein Gateway, keine SIM-Kosten, alles auf dem eigenen Gelände.</li>
+        <li><strong>Mischbetrieb ist erlaubt:</strong> Die Teichanlage per LoRaWAN, der einzelne Weiher am Waldrand
+          per NB-IoT – im LimnoNetz laufen beide Wege in derselben Auswertung zusammen.</li>
+      </ul>
+    </div>
+
+    <div class="callout">
+      <h2>Vorher testen statt raten</h2>
+      <p>Die Richtungsentscheidung lässt sich absichern, bevor Geräte bestellt werden:</p>
+      <ul>
+        <li><strong>NB-IoT:</strong> Abdeckungskarte des Anbieters prüfen und am Ufer mit einem Testgerät die
+          Signalstärke (RSRP) messen. Richtwert: bis etwa −110&nbsp;dBm unproblematisch, darunter wird es zäher, um
+          −135&nbsp;dBm liegt die praktische Grenze – dann auf Kosten von Sendedauer und Batterie.</li>
+        <li><strong>LoRaWAN:</strong> im TTN&nbsp;Mapper nachsehen, ob bereits ein Community-Gateway in Reichweite
+          steht. Sonst ein Gateway testweise am geplanten Ort betreiben und mit einem Sensor die Uferpunkte
+          abgehen.</li>
+        <li><strong>Sichtlinien-Test ohne Technik:</strong> Was ihr vom geplanten Gateway-Standort aus sehen könnt,
+          erreicht LoRaWAN meist auch. Was hinter einem Hügel liegt, eher nicht.</li>
+      </ul>
+    </div>
+
+    <p class="sub" style="margin-top:18px">Entscheidung gefallen? Der Umschalter oben blendet die passenden
+      Modellcodes ein – <span class="code">-NB</span>/<span class="code">-NS</span> für NB-IoT,
+      <span class="code">-LB</span>/<span class="code">-LS</span> für LoRaWAN.</p>
   </section>
 
   <section class="sec" aria-labelledby="h-code">
@@ -398,6 +605,7 @@
     <a href="https://www.dragino.com/products/water-air-quality-sensor/item/345-wqs-lb.html" rel="noopener">WQS-LB</a>,
     <a href="https://www.dragino.com/products/distance-level-sensor/item/301-dds75-nb.html" rel="noopener">DDS75-NB</a>).
     Stand: August 2026 · Angaben ohne Gewähr – Messbereiche und Kabellängen vor Bestellung im Wiki prüfen.
+    <br><a class="totop" href="#top">&uarr; Zurück nach oben</a>
   </footer>
 </div>
 
@@ -654,6 +862,25 @@ function render(){
   }
 }
 render();
+
+/* Sticky-Toolbar-Höhe an CSS melden, damit Sprungmarken nicht darunter landen. */
+const $toolbar = document.getElementById("toolbar");
+const syncToolbarHeight = () =>
+  document.documentElement.style.setProperty("--toolbar-h", $toolbar.offsetHeight + "px");
+syncToolbarHeight();
+if (window.ResizeObserver) new ResizeObserver(syncToolbarHeight).observe($toolbar);
+else window.addEventListener("resize", syncToolbarHeight);
+
+/* Deep-Link erneut anspringen, sobald Webfonts und Rest das Layout final gemacht haben. */
+if (location.hash) {
+  const jump = () => {
+    let target = null;
+    try { target = document.querySelector(location.hash); } catch { /* ungültiger Selektor */ }
+    if (target) target.scrollIntoView();
+  };
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(jump);
+  window.addEventListener("load", () => requestAnimationFrame(jump), { once:true });
+}
 </script>
 
 </body>
