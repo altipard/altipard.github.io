@@ -157,6 +157,16 @@
     }
     .banner.sichtbar { display: block; }
 
+    .druck { display: none; }
+
+    @media print {
+      @page { margin: 8mm; }
+      body { background: #fff; overflow: visible; }
+      body > *:not(.druck) { display: none !important; }
+      .druck { display: block; }
+      .druck img { width: 100%; height: auto; display: block; }
+    }
+
     /* MapLibre-Controls etwas an den Look anpassen */
     .maplibregl-ctrl-group { border-radius: 6px; }
     .maplibregl-ctrl-attrib { font-family: system-ui, sans-serif; }
@@ -188,8 +198,14 @@
     <button type="button" id="btn-leeren" title="Alle Markierungen entfernen" disabled>Leeren</button>
     <span class="trenner" aria-hidden="true"></span>
     <button type="button" id="btn-link" title="Link mit Ausschnitt und Markierungen kopieren">Link kopieren</button>
+    <span class="trenner" aria-hidden="true"></span>
+    <button type="button" id="btn-screenshot" title="Aktuellen Ausschnitt als PNG speichern">Screenshot</button>
+    <button type="button" id="btn-drucken" title="Aktuellen Ausschnitt drucken">Drucken</button>
     <p class="hinweis" id="hinweis"></p>
   </div>
+
+  <!-- Nur für den Druck: das fertige Kartenbild statt des WebGL-Canvas -->
+  <div class="druck" id="druck" aria-hidden="true"><img id="druck-bild" alt="Kartenausschnitt" /></div>
 
   <div class="banner" id="banner" role="alert"></div>
 
@@ -617,6 +633,106 @@
 
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && markierModus) setMarkierModus(false);
+      });
+
+      // ---------- Screenshot und Druck ----------
+
+      // Das WebGL-Canvas ist nach dem Rendern normalerweise leer (kein
+      // preserveDrawingBuffer). Deshalb im 'render'-Callback kopieren, direkt
+      // nachdem MapLibre gezeichnet hat, und unten eine Fußzeile mit Maßstab,
+      // Koordinaten und Attribution ergänzen.
+      function erzeugeKartenbild(fertig) {
+        map.once('render', function () {
+          var quelle = map.getCanvas();
+          var dpr = quelle.width / quelle.clientWidth || 1;
+          var c = document.createElement('canvas');
+          c.width = quelle.width;
+          c.height = quelle.height;
+          var ctx = c.getContext('2d');
+          ctx.drawImage(quelle, 0, 0);
+
+          var fs = 12 * dpr;
+          var rand = 8 * dpr;
+          var hoehe = fs * 2.4;
+          var y = c.height - hoehe / 2;
+
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+          ctx.fillRect(0, c.height - hoehe, c.width, hoehe);
+          ctx.font = fs + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#333';
+
+          // Maßstab: Breite und Beschriftung vom ScaleControl übernehmen
+          var x = rand;
+          var skala = document.querySelector('.maplibregl-ctrl-scale');
+          if (skala) {
+            var breite = skala.clientWidth * dpr;
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = Math.max(1, dpr);
+            ctx.beginPath();
+            ctx.moveTo(x, y - fs * 0.5);
+            ctx.lineTo(x, y + fs * 0.5);
+            ctx.lineTo(x + breite, y + fs * 0.5);
+            ctx.lineTo(x + breite, y - fs * 0.5);
+            ctx.stroke();
+            ctx.textAlign = 'left';
+            ctx.fillText(skala.textContent.trim(), x + breite + fs * 0.5, y);
+            x += breite + ctx.measureText(skala.textContent.trim()).width + fs * 2;
+          }
+
+          var mitte = map.getCenter();
+          var info = mitte.lat.toFixed(5) + ', ' + mitte.lng.toFixed(5) + '  ·  Zoom ' + map.getZoom().toFixed(1);
+          ctx.textAlign = 'left';
+          ctx.fillText(info, x, y);
+
+          ctx.textAlign = 'right';
+          ctx.fillStyle = '#555';
+          ctx.fillText('© OpenFreeMap  ·  © OpenMapTiles  ·  Daten von OpenStreetMap-Mitwirkenden', c.width - rand, y);
+
+          fertig(c);
+        });
+        map.triggerRepaint();
+      }
+
+      function dateiname() {
+        var mitte = map.getCenter();
+        var datum = new Date().toISOString().slice(0, 10);
+        return 'karte-' + datum + '-' + mitte.lat.toFixed(4) + '-' + mitte.lng.toFixed(4) + '-z' + map.getZoom().toFixed(1) + '.png';
+      }
+
+      document.getElementById('btn-screenshot').addEventListener('click', function () {
+        setHinweis('Screenshot wird erstellt …');
+        erzeugeKartenbild(function (c) {
+          c.toBlob(function (blob) {
+            if (!blob) { setHinweis('Screenshot fehlgeschlagen.'); return; }
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = dateiname();
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+            setHinweis('Screenshot gespeichert: ' + a.download);
+          }, 'image/png');
+        });
+      });
+
+      document.getElementById('btn-drucken').addEventListener('click', function () {
+        setHinweis('Druckansicht wird vorbereitet …');
+        erzeugeKartenbild(function (c) {
+          var bild = document.getElementById('druck-bild');
+          // Seitenausrichtung an den Ausschnitt anpassen
+          var seite = document.getElementById('druck-seite') || document.createElement('style');
+          seite.id = 'druck-seite';
+          seite.textContent = '@page { size: ' + (c.width > c.height ? 'landscape' : 'portrait') + '; margin: 8mm; }';
+          document.head.appendChild(seite);
+          bild.onload = function () {
+            setHinweis('');
+            window.print();
+          };
+          bild.src = c.toDataURL('image/png');
+        });
       });
 
       // ---------- Start ----------
