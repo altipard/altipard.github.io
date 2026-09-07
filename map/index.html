@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>map — wo bin ich?</title>
+  <meta name="description" content="Vollbild-Karte (OpenFreeMap Positron, MapLibre GL) mit der eigenen Position." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='2' fill='%230e1116'/%3E%3Ccircle cx='8' cy='8' r='3' fill='none' stroke='%2379c07a' stroke-width='1.8'/%3E%3Ccircle cx='8' cy='8' r='1' fill='%2379c07a'/%3E%3C/svg%3E" />
+
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" />
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+
+  <style>
+    :root {
+      --grund: #0e1116;
+      --text: #c9ccd1;
+      --hell: #f2f4f6;
+      --dim: #7d8590;
+      --link: #7cc7e8;
+      --prompt: #79c07a;
+      --warn: #e0af68;
+      --fehler: #f7768e;
+      --linie: #262c34;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      background: #f4f4f2; /* Positron-Hintergrund, bis der Style geladen ist */
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    #map {
+      position: fixed;
+      inset: 0;
+    }
+
+    #map.markieren .maplibregl-canvas { cursor: crosshair; }
+
+    /* Statuszeile oben links, im Terminal-Look der Startseite */
+    .hud {
+      position: fixed;
+      top: max(10px, env(safe-area-inset-top));
+      left: max(10px, env(safe-area-inset-left));
+      z-index: 5;
+      max-width: min(92vw, 44ch);
+      background: rgba(14, 17, 22, 0.92);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 8px 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+      pointer-events: none;
+    }
+
+    .hud a { pointer-events: auto; }
+
+    .hud .prompt { margin: 0; color: var(--dim); }
+    .hud .ps1 { color: var(--prompt); }
+    .hud .cmd { color: var(--hell); }
+
+    .hud .status { margin: 4px 0 0; color: var(--text); white-space: pre-wrap; }
+    .hud .status.warn { color: var(--warn); }
+    .hud .status.fehler { color: var(--fehler); }
+
+    .hud .koord {
+      margin: 4px 0 0;
+      color: var(--hell);
+      display: none;
+      user-select: text;
+      pointer-events: auto;
+    }
+    .hud .koord.sichtbar { display: block; }
+
+    .hud .zurueck {
+      display: block;
+      margin-top: 6px;
+      color: var(--link);
+      text-decoration: none;
+    }
+    .hud .zurueck:hover, .hud .zurueck:focus-visible { color: var(--hell); outline: none; }
+
+    /* Werkzeugleiste unten, zum Markieren von Gewässern */
+    .leiste {
+      position: fixed;
+      left: 50%;
+      bottom: max(28px, calc(env(safe-area-inset-bottom) + 28px));
+      transform: translateX(-50%);
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 96vw;
+      background: rgba(14, 17, 22, 0.92);
+      border-radius: 6px;
+      padding: 6px 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+    }
+
+    .leiste button {
+      font: inherit;
+      color: var(--text);
+      background: transparent;
+      border: 1px solid var(--linie);
+      border-radius: 4px;
+      padding: 4px 9px;
+      cursor: pointer;
+      line-height: 1.3;
+    }
+    .leiste button:hover, .leiste button:focus-visible { color: var(--hell); border-color: var(--dim); outline: none; }
+    .leiste button.aktiv { color: var(--hell); border-color: var(--prompt); }
+    .leiste button:disabled { opacity: 0.4; cursor: default; }
+
+    .leiste .trenner { width: 1px; height: 18px; background: var(--linie); margin: 0 2px; }
+
+    .leiste .farbe {
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    .leiste .farbe.aktiv { border-color: var(--hell); }
+
+    .leiste .hinweis {
+      flex-basis: 100%;
+      margin: 2px 0 0;
+      color: var(--dim);
+      text-align: center;
+      display: none;
+    }
+    .leiste .hinweis.sichtbar { display: block; }
+
+    /* Fehlerbanner, wenn die Karte selbst nicht lädt */
+    .banner {
+      position: fixed;
+      left: 50%;
+      bottom: max(90px, calc(env(safe-area-inset-bottom) + 90px));
+      transform: translateX(-50%);
+      z-index: 6;
+      max-width: 92vw;
+      background: rgba(14, 17, 22, 0.94);
+      color: var(--fehler);
+      border-radius: 6px;
+      padding: 8px 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      display: none;
+    }
+    .banner.sichtbar { display: block; }
+
+    /* MapLibre-Controls etwas an den Look anpassen */
+    .maplibregl-ctrl-group { border-radius: 6px; }
+    .maplibregl-ctrl-attrib { font-family: system-ui, sans-serif; }
+
+    @media (max-width: 560px) {
+      body { font-size: 12px; }
+      .hud { padding: 6px 10px; }
+      .leiste { gap: 4px; padding: 5px 6px; }
+      .leiste button { padding: 4px 7px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="map" role="application" aria-label="Karte"></div>
+
+  <aside class="hud" aria-live="polite">
+    <p class="prompt"><span class="ps1">daniel@web:~$</span> <span class="cmd">whereami</span></p>
+    <p class="status" id="status">Standort wird ermittelt …</p>
+    <p class="koord" id="koord"></p>
+    <a class="zurueck" href="../">← altipard</a>
+  </aside>
+
+  <div class="leiste" role="toolbar" aria-label="Gewässer markieren">
+    <button type="button" id="btn-markieren" aria-pressed="false" title="Gewässer per Klick markieren">Markieren</button>
+    <span class="trenner" aria-hidden="true"></span>
+    <span id="farben"></span>
+    <span class="trenner" aria-hidden="true"></span>
+    <button type="button" id="btn-modus" title="Markierte Flächen füllen oder nur umranden">Füllung</button>
+    <button type="button" id="btn-leeren" title="Alle Markierungen entfernen" disabled>Leeren</button>
+    <span class="trenner" aria-hidden="true"></span>
+    <button type="button" id="btn-link" title="Link mit Ausschnitt und Markierungen kopieren">Link kopieren</button>
+    <p class="hinweis" id="hinweis"></p>
+  </div>
+
+  <div class="banner" id="banner" role="alert"></div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
+
+      // Fallback-Ausschnitt, wenn kein Standort verfügbar ist: Deutschland
+      var FALLBACK = { center: [10.4, 51.2], zoom: 5.3 };
+      var ZOOM_AM_STANDORT = 15;
+
+      // URL-Hash: #k=<zoom>/<lat>/<lon>  →  Ausschnitt (schreibt MapLibre selbst)
+      //           &g=f<id>.<farbe>,l<name>.<farbe>  →  markierte Gewässer
+      //           &m=r  →  Flächen nur umranden statt füllen
+      var HASH_NAME = 'k';
+
+      var FARBEN = [
+        { name: 'Rot',    wert: '#e0475b' },
+        { name: 'Orange', wert: '#f39c3a' },
+        { name: 'Grün',   wert: '#3fae5a' },
+        { name: 'Lila',   wert: '#9b5de5' }
+      ];
+
+      var statusEl = document.getElementById('status');
+      var koordEl = document.getElementById('koord');
+      var bannerEl = document.getElementById('banner');
+      var hinweisEl = document.getElementById('hinweis');
+      var mapEl = document.getElementById('map');
+      var btnMarkieren = document.getElementById('btn-markieren');
+      var btnModus = document.getElementById('btn-modus');
+      var btnLeeren = document.getElementById('btn-leeren');
+      var btnLink = document.getElementById('btn-link');
+      var farbenEl = document.getElementById('farben');
+
+      function setStatus(text, art) {
+        statusEl.textContent = text;
+        statusEl.className = 'status' + (art ? ' ' + art : '');
+      }
+
+      function zeigeBanner(text) {
+        bannerEl.textContent = text;
+        bannerEl.classList.add('sichtbar');
+      }
+
+      function setHinweis(text) {
+        hinweisEl.textContent = text || '';
+        hinweisEl.classList.toggle('sichtbar', !!text);
+      }
+
+      function hatWebGL() {
+        try {
+          var c = document.createElement('canvas');
+          return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl')));
+        } catch (e) {
+          return false;
+        }
+      }
+
+      if (typeof maplibregl === 'undefined') {
+        setStatus('Kartenbibliothek konnte nicht geladen werden.', 'fehler');
+        zeigeBanner('MapLibre GL JS ist nicht erreichbar (CDN blockiert oder offline).');
+        return;
+      }
+
+      if (!hatWebGL()) {
+        setStatus('Dieser Browser unterstützt kein WebGL.', 'fehler');
+        zeigeBanner('Ohne WebGL kann die Vektorkarte nicht dargestellt werden.');
+        return;
+      }
+
+      if (!window.isSecureContext) {
+        // Geolocation gibt es nur über HTTPS oder localhost (nicht über file://)
+        setStatus('Kein sicherer Kontext – Standort nicht abfragbar.', 'warn');
+      }
+
+      // ---------- URL-Hash lesen/schreiben (neben dem Ausschnitt von MapLibre) ----------
+
+      function leseHashParams() {
+        var params = {};
+        window.location.hash.slice(1).split('&').forEach(function (teil) {
+          if (!teil) return;
+          var i = teil.indexOf('=');
+          if (i < 0) { params[teil] = ''; return; }
+          params[teil.slice(0, i)] = teil.slice(i + 1);
+        });
+        return params;
+      }
+
+      function schreibeHashParam(name, wert) {
+        var teile = window.location.hash.slice(1).split('&').filter(function (teil) {
+          return teil && teil.indexOf(name + '=') !== 0;
+        });
+        if (wert) teile.push(name + '=' + wert);
+        // Den Ausschnitt-Teil von MapLibre immer vorne lassen
+        teile.sort(function (a, b) {
+          return (b.indexOf(HASH_NAME + '=') === 0) - (a.indexOf(HASH_NAME + '=') === 0);
+        });
+        var neu = teile.length ? '#' + teile.join('&') : window.location.pathname + window.location.search;
+        history.replaceState(null, '', neu);
+      }
+
+      var startParams = leseHashParams();
+      var ausschnittAusUrl = !!startParams[HASH_NAME];
+
+      // ---------- Karte ----------
+
+      var map = new maplibregl.Map({
+        container: 'map',
+        style: STYLE_URL,
+        center: FALLBACK.center,
+        zoom: FALLBACK.zoom,
+        hash: HASH_NAME,
+        attributionControl: { compact: false }
+      });
+
+      // Zum Ausprobieren in der Browser-Konsole: karte.setPaintProperty(...)
+      window.karte = map;
+
+      map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right');
+      map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
+
+      var geolocate = new maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+        fitBoundsOptions: { maxZoom: ZOOM_AM_STANDORT },
+        trackUserLocation: true,
+        showAccuracyCircle: true,
+        showUserLocation: true
+      });
+      map.addControl(geolocate, 'top-right');
+
+      var standortGefunden = false;
+
+      function formatKoord(coords) {
+        var lat = coords.latitude.toFixed(5);
+        var lon = coords.longitude.toFixed(5);
+        var acc = Math.round(coords.accuracy);
+        return lat + ', ' + lon + '  ±' + acc + ' m';
+      }
+
+      geolocate.on('geolocate', function (e) {
+        standortGefunden = true;
+        setStatus('Standort gefunden.');
+        koordEl.textContent = formatKoord(e.coords);
+        koordEl.classList.add('sichtbar');
+      });
+
+      geolocate.on('error', function (e) {
+        var text;
+        switch (e && e.code) {
+          case 1: text = 'Standortfreigabe abgelehnt – Karte zeigt Deutschland.'; break;
+          case 2: text = 'Standort nicht verfügbar – Karte zeigt Deutschland.'; break;
+          case 3: text = 'Standortabfrage hat zu lange gedauert – Karte zeigt Deutschland.'; break;
+          default: text = 'Standort konnte nicht ermittelt werden – Karte zeigt Deutschland.';
+        }
+        setStatus(text + '\nÜber den Zielsymbol-Button rechts oben erneut versuchen.', 'warn');
+        if (!standortGefunden && !ausschnittAusUrl) {
+          map.easeTo({ center: FALLBACK.center, zoom: FALLBACK.zoom });
+        }
+      });
+
+      geolocate.on('trackuserlocationend', function () {
+        if (standortGefunden) {
+          setStatus('Verfolgung pausiert – Zielsymbol rechts oben tippen, um zurückzuspringen.');
+        }
+      });
+
+      geolocate.on('trackuserlocationstart', function () {
+        if (standortGefunden) setStatus('Standort wird verfolgt.');
+      });
+
+      // ---------- Gewässer kräftiger einfärben ----------
+
+      // Positron zeichnet Wasser sehr blass (Flächen grau, Bäche grau-blau, keine
+      // Breitenstaffelung). Hier kräftiger einfärben, damit Seen, Bäche und Flüsse
+      // auf einen Blick erkennbar sind.
+      function betoneGewaesser() {
+        var wasserBlau = '#8dbfe3';
+        var linienBlau = '#4f97cf';
+        var labelBlau = '#2f6ba3';
+
+        function setzePaint(layerId, prop, wert) {
+          if (map.getLayer(layerId)) map.setPaintProperty(layerId, prop, wert);
+        }
+
+        setzePaint('water', 'fill-color', wasserBlau);
+        setzePaint('water', 'fill-outline-color', linienBlau);
+
+        // Flüsse breiter als Kanäle, Kanäle breiter als Bäche; alles wächst mit dem Zoom
+        var breiteNachKlasse = function (fluss, kanal, bach) {
+          return ['match', ['get', 'class'], 'river', fluss, 'canal', kanal, bach];
+        };
+        setzePaint('waterway', 'line-color', linienBlau);
+        setzePaint('waterway', 'line-width', [
+          'interpolate', ['linear'], ['zoom'],
+          6, breiteNachKlasse(0.8, 0.5, 0.4),
+          10, breiteNachKlasse(1.6, 1.0, 0.7),
+          13, breiteNachKlasse(3.0, 1.8, 1.2),
+          16, breiteNachKlasse(6.0, 3.5, 2.2)
+        ]);
+
+        setzePaint('waterway_line_label', 'text-color', labelBlau);
+        setzePaint('water_name_point_label', 'text-color', labelBlau);
+        setzePaint('water_name_line_label', 'text-color', labelBlau);
+      }
+
+      // ---------- Gewässer markieren ----------
+
+      // Markierungen: Flächen (Seen, Weiher, breite Flüsse) über ihre Feature-ID,
+      // Linien (Bäche, Flüsse, Kanäle) über ihren Namen, weil ein Bach aus vielen
+      // Segmenten mit eigenen IDs besteht.
+      var markierungen = { flaechen: {}, linien: {} };   // schluessel → Farbindex
+      var markierModus = false;
+      var nurRahmen = startParams.m === 'r';
+      var aktiveFarbe = 0;
+
+      var LAYER_FLAECHE = 'markiert-flaeche';
+      var LAYER_FLAECHE_RAHMEN = 'markiert-flaeche-rahmen';
+      var LAYER_LINIE = 'markiert-linie';
+
+      function farbAusdruck(eingabe, tabelle) {
+        var schluessel = Object.keys(tabelle);
+        if (!schluessel.length) return FARBEN[0].wert;
+        var ausdruck = ['match', eingabe];
+        schluessel.forEach(function (s) {
+          ausdruck.push(tabelle[s].typ === 'zahl' ? Number(s) : s, FARBEN[tabelle[s].farbe].wert);
+        });
+        ausdruck.push(FARBEN[0].wert);
+        return ausdruck;
+      }
+
+      function filterAusdruck(eingabe, tabelle, alsZahl) {
+        var schluessel = Object.keys(tabelle);
+        if (!schluessel.length) return false;
+        return ['in', eingabe, ['literal', schluessel.map(function (s) { return alsZahl ? Number(s) : s; })]];
+      }
+
+      function legeMarkierLayerAn() {
+        var layers = map.getStyle().layers;
+        var vorId = null;
+        for (var i = 0; i < layers.length; i++) {
+          if (layers[i].id === 'waterway' && layers[i + 1]) { vorId = layers[i + 1].id; break; }
+        }
+
+        map.addLayer({
+          id: LAYER_FLAECHE, type: 'fill', source: 'openmaptiles', 'source-layer': 'water',
+          filter: false,
+          paint: { 'fill-color': FARBEN[0].wert, 'fill-opacity': 0.45 }
+        }, vorId);
+        map.addLayer({
+          id: LAYER_FLAECHE_RAHMEN, type: 'line', source: 'openmaptiles', 'source-layer': 'water',
+          filter: false,
+          layout: { 'line-join': 'round' },
+          paint: {
+            'line-color': FARBEN[0].wert,
+            'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.5, 14, 3, 18, 5]
+          }
+        }, vorId);
+        map.addLayer({
+          id: LAYER_LINIE, type: 'line', source: 'openmaptiles', 'source-layer': 'waterway',
+          filter: false,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: {
+            'line-color': FARBEN[0].wert,
+            'line-width': ['interpolate', ['linear'], ['zoom'], 6, 2, 10, 3.5, 13, 5.5, 16, 9],
+            'line-opacity': 0.85
+          }
+        }, vorId);
+
+        wendeMarkierungenAn();
+      }
+
+      function wendeMarkierungenAn() {
+        if (!map.getLayer(LAYER_FLAECHE)) return;
+
+        var fl = {}, li = {};
+        Object.keys(markierungen.flaechen).forEach(function (k) { fl[k] = { farbe: markierungen.flaechen[k], typ: 'zahl' }; });
+        Object.keys(markierungen.linien).forEach(function (k) { li[k] = { farbe: markierungen.linien[k], typ: 'text' }; });
+
+        map.setFilter(LAYER_FLAECHE, filterAusdruck(['id'], fl, true));
+        map.setFilter(LAYER_FLAECHE_RAHMEN, filterAusdruck(['id'], fl, true));
+        map.setFilter(LAYER_LINIE, filterAusdruck(['get', 'name'], li, false));
+
+        map.setPaintProperty(LAYER_FLAECHE, 'fill-color', farbAusdruck(['id'], fl));
+        map.setPaintProperty(LAYER_FLAECHE_RAHMEN, 'line-color', farbAusdruck(['id'], fl));
+        map.setPaintProperty(LAYER_LINIE, 'line-color', farbAusdruck(['get', 'name'], li));
+
+        map.setLayoutProperty(LAYER_FLAECHE, 'visibility', nurRahmen ? 'none' : 'visible');
+
+        var anzahl = Object.keys(markierungen.flaechen).length + Object.keys(markierungen.linien).length;
+        btnLeeren.disabled = anzahl === 0;
+        schreibeMarkierungenInUrl();
+      }
+
+      function schreibeMarkierungenInUrl() {
+        var teile = [];
+        Object.keys(markierungen.flaechen).forEach(function (k) {
+          teile.push('f' + k + '.' + markierungen.flaechen[k]);
+        });
+        Object.keys(markierungen.linien).forEach(function (k) {
+          teile.push('l' + encodeURIComponent(k) + '.' + markierungen.linien[k]);
+        });
+        schreibeHashParam('g', teile.join(','));
+        schreibeHashParam('m', nurRahmen ? 'r' : '');
+      }
+
+      function leseMarkierungenAusUrl() {
+        var g = startParams.g;
+        if (!g) return;
+        g.split(',').forEach(function (eintrag) {
+          var punkt = eintrag.lastIndexOf('.');
+          if (punkt < 2) return;
+          var typ = eintrag[0];
+          var schluessel = eintrag.slice(1, punkt);
+          var farbe = parseInt(eintrag.slice(punkt + 1), 10);
+          if (isNaN(farbe) || farbe < 0 || farbe >= FARBEN.length) farbe = 0;
+          if (typ === 'f' && /^\d+$/.test(schluessel)) {
+            markierungen.flaechen[schluessel] = farbe;
+          } else if (typ === 'l') {
+            try { markierungen.linien[decodeURIComponent(schluessel)] = farbe; } catch (e) { /* kaputter Eintrag, ignorieren */ }
+          }
+        });
+      }
+
+      function toggleMarkierung(typ, schluessel) {
+        var tabelle = typ === 'flaeche' ? markierungen.flaechen : markierungen.linien;
+        if (tabelle[schluessel] === aktiveFarbe) {
+          delete tabelle[schluessel];
+        } else {
+          tabelle[schluessel] = aktiveFarbe;
+        }
+        wendeMarkierungenAn();
+      }
+
+      function klickAufKarte(e) {
+        if (!markierModus) return;
+        var p = e.point;
+        var toleranz = 6;
+        var box = [[p.x - toleranz, p.y - toleranz], [p.x + toleranz, p.y + toleranz]];
+
+        // Linien zuerst (schmal, sonst schluckt eine Fläche darunter den Klick)
+        var linien = map.queryRenderedFeatures(box, { layers: ['waterway'] });
+        var linie = null;
+        for (var i = 0; i < linien.length; i++) {
+          if (linien[i].properties && linien[i].properties.name) { linie = linien[i]; break; }
+        }
+        if (linie) {
+          toggleMarkierung('linie', linie.properties.name);
+          setHinweis(linie.properties.name + (markierungen.linien[linie.properties.name] === undefined ? ' entfernt' : ' markiert'));
+          return;
+        }
+        if (linien.length) {
+          setHinweis('Dieser Bach hat keinen Namen und lässt sich nicht markieren.');
+          return;
+        }
+
+        var flaechen = map.queryRenderedFeatures(p, { layers: ['water'] });
+        if (flaechen.length && flaechen[0].id !== undefined) {
+          var id = String(flaechen[0].id);
+          toggleMarkierung('flaeche', id);
+          setHinweis('Fläche ' + (markierungen.flaechen[id] === undefined ? 'entfernt' : 'markiert'));
+          return;
+        }
+        setHinweis('Hier ist kein Gewässer.');
+      }
+
+      // ---------- Werkzeugleiste ----------
+
+      FARBEN.forEach(function (f, i) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'farbe' + (i === aktiveFarbe ? ' aktiv' : '');
+        b.style.background = f.wert;
+        b.title = f.name;
+        b.setAttribute('aria-label', 'Farbe ' + f.name);
+        b.addEventListener('click', function () {
+          aktiveFarbe = i;
+          Array.prototype.forEach.call(farbenEl.children, function (el, j) {
+            el.classList.toggle('aktiv', j === i);
+          });
+          if (!markierModus) setMarkierModus(true);
+        });
+        farbenEl.appendChild(b);
+      });
+
+      function setMarkierModus(an) {
+        markierModus = an;
+        btnMarkieren.classList.toggle('aktiv', an);
+        btnMarkieren.setAttribute('aria-pressed', String(an));
+        mapEl.classList.toggle('markieren', an);
+        setHinweis(an ? 'Auf einen See, Weiher, Bach oder Fluss klicken. Nochmal klicken entfernt die Markierung.' : '');
+      }
+
+      btnMarkieren.addEventListener('click', function () { setMarkierModus(!markierModus); });
+
+      function zeigeModus() {
+        btnModus.textContent = nurRahmen ? 'Rahmen' : 'Füllung';
+        btnModus.classList.toggle('aktiv', nurRahmen);
+      }
+      btnModus.addEventListener('click', function () {
+        nurRahmen = !nurRahmen;
+        zeigeModus();
+        wendeMarkierungenAn();
+      });
+      zeigeModus();
+
+      btnLeeren.addEventListener('click', function () {
+        markierungen.flaechen = {};
+        markierungen.linien = {};
+        wendeMarkierungenAn();
+        setHinweis('Markierungen entfernt.');
+      });
+
+      btnLink.addEventListener('click', function () {
+        var url = window.location.href;
+        var fertig = function () { setHinweis('Link kopiert: ' + url); };
+        var fehlgeschlagen = function () { setHinweis('Kopieren nicht möglich – Adresse aus der Adresszeile nehmen.'); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(fertig, fehlgeschlagen);
+        } else {
+          fehlgeschlagen();
+        }
+      });
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && markierModus) setMarkierModus(false);
+      });
+
+      // ---------- Start ----------
+
+      leseMarkierungenAusUrl();
+
+      map.on('style.load', function () {
+        betoneGewaesser();
+        legeMarkierLayerAn();
+      });
+
+      map.on('click', klickAufKarte);
+
+      map.on('load', function () {
+        if (ausschnittAusUrl) {
+          setStatus('Ausschnitt aus der URL geladen.\nZielsymbol rechts oben zeigt den eigenen Standort.');
+          return;
+        }
+        if (!('geolocation' in navigator)) {
+          setStatus('Dieser Browser bietet keine Standortabfrage – Karte zeigt Deutschland.', 'warn');
+          return;
+        }
+        if (!window.isSecureContext) return;
+        geolocate.trigger();
+      });
+
+      var kartenfehlerGemeldet = false;
+      map.on('error', function (e) {
+        if (kartenfehlerGemeldet) return;
+        var err = e && e.error;
+        var status = err && (err.status || (err.message && err.message.match(/\b(4\d\d|5\d\d)\b/)));
+        // Nur echte Lade-/Netzwerkfehler melden, keine Style-Warnungen
+        if (err && (status || /Failed to fetch|NetworkError|Load failed/i.test(err.message || ''))) {
+          kartenfehlerGemeldet = true;
+          zeigeBanner('Kartendaten von tiles.openfreemap.org konnten nicht geladen werden. Später erneut versuchen.');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
