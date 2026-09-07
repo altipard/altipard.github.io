@@ -24,6 +24,7 @@
     }
 
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
 
     html, body { height: 100%; }
 
@@ -42,7 +43,9 @@
       inset: 0;
     }
 
-    #map.markieren .maplibregl-canvas { cursor: crosshair; }
+    #map.markieren .maplibregl-canvas,
+    #map.zeichnen .maplibregl-canvas { cursor: crosshair; }
+    #map.auswahl .maplibregl-canvas { cursor: pointer; }
 
     /* Statuszeile oben links, im Terminal-Look der Startseite */
     .hud {
@@ -86,24 +89,30 @@
     }
     .hud .zurueck:hover, .hud .zurueck:focus-visible { color: var(--hell); outline: none; }
 
-    /* Werkzeugleiste unten, zum Markieren von Gewässern */
+    /* Werkzeugleiste unten */
     .leiste {
       position: fixed;
       left: 50%;
       bottom: max(28px, calc(env(safe-area-inset-bottom) + 28px));
       transform: translateX(-50%);
       z-index: 5;
+      max-width: 96vw;
+      background: rgba(14, 17, 22, 0.92);
+      border-radius: 6px;
+      padding: 6px 34px 6px 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+    }
+
+    .leiste .zeile {
       display: flex;
       align-items: center;
       gap: 6px;
       flex-wrap: wrap;
       justify-content: center;
-      max-width: 96vw;
-      background: rgba(14, 17, 22, 0.92);
-      border-radius: 6px;
-      padding: 6px 8px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
     }
+    .leiste .zeile + .zeile { margin-top: 6px; }
+
+    .leiste .label { color: var(--dim); margin-right: 2px; }
 
     .leiste button {
       font: inherit;
@@ -131,14 +140,51 @@
     }
     .leiste .farbe.aktiv { border-color: var(--hell); }
 
+    .leiste .eigen {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px dashed var(--dim);
+      overflow: hidden;
+      cursor: pointer;
+      position: relative;
+      flex: none;
+    }
+    .leiste .eigen.aktiv { border-color: var(--hell); border-style: solid; }
+    .leiste .eigen input {
+      position: absolute;
+      inset: -6px;
+      width: calc(100% + 12px);
+      height: calc(100% + 12px);
+      padding: 0;
+      border: 0;
+      cursor: pointer;
+    }
+
+    .leiste .breite { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); }
+    .leiste .breite input { width: 80px; accent-color: var(--prompt); }
+    .leiste .breite span { color: var(--hell); min-width: 2ch; text-align: right; }
+
     .leiste .hinweis {
-      flex-basis: 100%;
-      margin: 2px 0 0;
+      margin: 6px 0 0;
       color: var(--dim);
       text-align: center;
       display: none;
     }
     .leiste .hinweis.sichtbar { display: block; }
+
+    .leiste .zuklappen {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      line-height: 1;
+    }
+    .leiste.zu { padding-right: 8px; }
+    .leiste.zu .zeile, .leiste.zu .hinweis { display: none; }
+    .leiste.zu .zuklappen { position: static; width: auto; height: auto; padding: 4px 9px; }
 
     /* Fehlerbanner, wenn die Karte selbst nicht lädt */
     .banner {
@@ -174,8 +220,10 @@
     @media (max-width: 560px) {
       body { font-size: 12px; }
       .hud { padding: 6px 10px; }
-      .leiste { gap: 4px; padding: 5px 6px; }
+      .leiste { gap: 4px; padding: 5px 30px 5px 6px; bottom: max(24px, calc(env(safe-area-inset-bottom) + 24px)); }
+      .leiste .zeile { gap: 4px; }
       .leiste button { padding: 4px 7px; }
+      .leiste .label { display: none; }
     }
   </style>
 </head>
@@ -189,18 +237,43 @@
     <a class="zurueck" href="../">← altipard</a>
   </aside>
 
-  <div class="leiste" role="toolbar" aria-label="Gewässer markieren">
-    <button type="button" id="btn-markieren" aria-pressed="false" title="Gewässer per Klick markieren">Markieren</button>
-    <span class="trenner" aria-hidden="true"></span>
-    <span id="farben"></span>
-    <span class="trenner" aria-hidden="true"></span>
-    <button type="button" id="btn-modus" title="Markierte Flächen füllen oder nur umranden">Füllung</button>
-    <button type="button" id="btn-leeren" title="Alle Markierungen entfernen" disabled>Leeren</button>
-    <span class="trenner" aria-hidden="true"></span>
-    <button type="button" id="btn-link" title="Link mit Ausschnitt und Markierungen kopieren">Link kopieren</button>
-    <span class="trenner" aria-hidden="true"></span>
-    <button type="button" id="btn-screenshot" title="Aktuellen Ausschnitt als PNG speichern">Screenshot</button>
-    <button type="button" id="btn-drucken" title="Aktuellen Ausschnitt drucken">Drucken</button>
+  <div class="leiste" id="leiste" role="toolbar" aria-label="Werkzeuge">
+    <button type="button" class="zuklappen" id="btn-zuklappen" title="Werkzeugleiste ein-/ausklappen" aria-label="Werkzeugleiste ein-/ausklappen">–</button>
+
+    <div class="zeile">
+      <span class="label">Gewässer</span>
+      <button type="button" id="btn-markieren" aria-pressed="false" title="Gewässer per Klick markieren">Markieren</button>
+      <button type="button" id="btn-modus" title="Markierte Flächen füllen oder nur umranden">Gefüllt</button>
+      <button type="button" id="btn-leeren" title="Alle Gewässer-Markierungen entfernen" disabled>Leeren</button>
+      <span class="trenner" aria-hidden="true"></span>
+      <span class="label">Zeichnen</span>
+      <button type="button" data-werkzeug="linie" title="Linie: Punkte klicken, Doppelklick oder Enter beendet">Linie</button>
+      <button type="button" data-werkzeug="freihand" title="Freihand: mit gedrückter Maustaste oder Finger zeichnen">Freihand</button>
+      <button type="button" data-werkzeug="polygon" title="Polygon: Punkte klicken, Klick auf den ersten Punkt oder Enter schließt">Polygon</button>
+      <button type="button" data-werkzeug="text" title="Text: auf die Karte klicken und Text eingeben">Text</button>
+      <button type="button" data-werkzeug="auswahl" title="Auswahl: Zeichnung anklicken, dann umfärben, Breite ändern oder löschen">Auswahl</button>
+      <button type="button" id="btn-fertig" hidden title="Aktuelle Linie oder Fläche abschließen">Fertig</button>
+    </div>
+
+    <div class="zeile">
+      <span class="label">Stil</span>
+      <span id="farben"></span>
+      <label class="eigen" id="farbe-eigen-label" title="Eigene Farbe"><input type="color" id="farbe-eigen" value="#1f6feb" aria-label="Eigene Farbe" /></label>
+      <label class="breite" title="Strichstärke, bestimmt auch die Textgröße">Breite <input type="range" id="breite" min="1" max="12" value="3" aria-label="Strichstärke" /><span id="breite-wert">3</span></label>
+      <button type="button" id="btn-fuellen" class="aktiv" aria-pressed="true" title="Polygone halbtransparent füllen">Füllen</button>
+      <span class="trenner" aria-hidden="true"></span>
+      <button type="button" id="btn-rueckgaengig" title="Letzte Zeichnung entfernen" disabled>Rückgängig</button>
+      <button type="button" id="btn-loeschen" hidden title="Ausgewählte Zeichnung löschen">Löschen</button>
+      <button type="button" id="btn-text-aendern" hidden title="Text der Auswahl ändern">Text ändern</button>
+      <span class="trenner" aria-hidden="true"></span>
+      <button type="button" id="btn-link" title="Link mit Ausschnitt, Markierungen und Zeichnungen kopieren">Link kopieren</button>
+      <button type="button" id="btn-screenshot" title="Aktuellen Ausschnitt als PNG speichern">Screenshot</button>
+      <button type="button" id="btn-drucken" title="Aktuellen Ausschnitt drucken">Drucken</button>
+      <button type="button" id="btn-export" title="Zeichnungen und Markierungen als GeoJSON speichern">Export</button>
+      <button type="button" id="btn-import" title="GeoJSON-Datei laden">Import</button>
+      <input type="file" id="import-datei" accept=".geojson,.json,application/geo+json,application/json" hidden />
+    </div>
+
     <p class="hinweis" id="hinweis"></p>
   </div>
 
@@ -222,6 +295,7 @@
       // URL-Hash: #k=<zoom>/<lat>/<lon>  →  Ausschnitt (schreibt MapLibre selbst)
       //           &g=f<id>.<farbe>,l<name>.<farbe>  →  markierte Gewässer
       //           &m=r  →  Flächen nur umranden statt füllen
+      //           &z=g<base64url(gzip(json))>  →  Zeichnungen (j… = unkomprimiert)
       var HASH_NAME = 'k';
 
       var FARBEN = [
@@ -241,6 +315,16 @@
       var btnLeeren = document.getElementById('btn-leeren');
       var btnLink = document.getElementById('btn-link');
       var farbenEl = document.getElementById('farben');
+      var farbeEigen = document.getElementById('farbe-eigen');
+      var farbeEigenLabel = document.getElementById('farbe-eigen-label');
+      var breiteEl = document.getElementById('breite');
+      var breiteWertEl = document.getElementById('breite-wert');
+      var btnFuellen = document.getElementById('btn-fuellen');
+      var btnFertig = document.getElementById('btn-fertig');
+      var btnRueckgaengig = document.getElementById('btn-rueckgaengig');
+      var btnLoeschen = document.getElementById('btn-loeschen');
+      var btnTextAendern = document.getElementById('btn-text-aendern');
+      var werkzeugButtons = Array.prototype.slice.call(document.querySelectorAll('[data-werkzeug]'));
 
       function setStatus(text, art) {
         statusEl.textContent = text;
@@ -309,6 +393,44 @@
         history.replaceState(null, '', neu);
       }
 
+      // Bytes ↔ base64url, optional gzip (CompressionStream fehlt in älteren Safari-Versionen)
+      function zuBase64url(bytes) {
+        var s = '';
+        for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+        return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+
+      function vonBase64url(text) {
+        var s = atob(text.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((text.length + 3) % 4));
+        var bytes = new Uint8Array(s.length);
+        for (var i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
+        return bytes;
+      }
+
+      function packeText(text) {
+        var roh = new TextEncoder().encode(text);
+        if (typeof CompressionStream === 'undefined') return Promise.resolve('j' + zuBase64url(roh));
+        var cs = new CompressionStream('gzip');
+        var w = cs.writable.getWriter();
+        w.write(roh);
+        w.close();
+        return new Response(cs.readable).arrayBuffer().then(function (buf) {
+          return 'g' + zuBase64url(new Uint8Array(buf));
+        });
+      }
+
+      function entpackeText(kodiert) {
+        var art = kodiert[0];
+        var bytes = vonBase64url(kodiert.slice(1));
+        if (art === 'j') return Promise.resolve(new TextDecoder().decode(bytes));
+        if (typeof DecompressionStream === 'undefined') return Promise.reject(new Error('Dieser Browser kann den Link nicht entpacken.'));
+        var ds = new DecompressionStream('gzip');
+        var w = ds.writable.getWriter();
+        w.write(bytes);
+        w.close();
+        return new Response(ds.readable).text();
+      }
+
       var startParams = leseHashParams();
       var ausschnittAusUrl = !!startParams[HASH_NAME];
 
@@ -320,7 +442,18 @@
         center: FALLBACK.center,
         zoom: FALLBACK.zoom,
         hash: HASH_NAME,
-        attributionControl: { compact: false }
+        attributionControl: { compact: false },
+        locale: {
+          'NavigationControl.ZoomIn': 'Hineinzoomen',
+          'NavigationControl.ZoomOut': 'Herauszoomen',
+          'NavigationControl.ResetBearing': 'Nach Norden ausrichten',
+          'GeolocateControl.FindMyLocation': 'Eigenen Standort anzeigen',
+          'GeolocateControl.LocationNotAvailable': 'Standort nicht verfügbar',
+          'ScaleControl.Meters': 'm',
+          'ScaleControl.Kilometers': 'km',
+          'AttributionControl.ToggleAttribution': 'Quellenangaben ein-/ausblenden',
+          'Map.Title': 'Karte. Mit Pfeiltasten verschieben, Plus und Minus zoomen.'
+        }
       });
 
       // Zum Ausprobieren in der Browser-Konsole: karte.setPaintProperty(...)
@@ -411,6 +544,20 @@
         setzePaint('waterway_line_label', 'text-color', labelBlau);
         setzePaint('water_name_point_label', 'text-color', labelBlau);
         setzePaint('water_name_line_label', 'text-color', labelBlau);
+      }
+
+      // ---------- Deutsche Beschriftung ----------
+
+      // Positron beschriftet mit englischen Namen (name_en). OpenMapTiles liefert
+      // name_de für alles, was einen deutschen Namen hat; sonst der lateinische
+      // bzw. lokale Name.
+      function deutscheBeschriftung() {
+        var deutsch = ['coalesce', ['get', 'name_de'], ['get', 'name:de'], ['get', 'name:latin'], ['get', 'name']];
+        map.getStyle().layers.forEach(function (layer) {
+          if (layer.type !== 'symbol' || !layer.layout || !layer.layout['text-field']) return;
+          if (JSON.stringify(layer.layout['text-field']).indexOf('name') === -1) return;
+          map.setLayoutProperty(layer.id, 'text-field', deutsch);
+        });
       }
 
       // ---------- Gewässer markieren ----------
@@ -513,8 +660,7 @@
         schreibeHashParam('m', nurRahmen ? 'r' : '');
       }
 
-      function leseMarkierungenAusUrl() {
-        var g = startParams.g;
+      function leseMarkierungen(g) {
         if (!g) return;
         g.split(',').forEach(function (eintrag) {
           var punkt = eintrag.lastIndexOf('.');
@@ -541,8 +687,7 @@
         wendeMarkierungenAn();
       }
 
-      function klickAufKarte(e) {
-        if (!markierModus) return;
+      function markierKlick(e) {
         var p = e.point;
         var toleranz = 6;
         var box = [[p.x - toleranz, p.y - toleranz], [p.x + toleranz, p.y + toleranz]];
@@ -573,7 +718,361 @@
         setHinweis('Hier ist kein Gewässer.');
       }
 
+      // ---------- Zeichnen: Linien, Freihand, Polygone, Text ----------
+
+      var zeichnung = { type: 'FeatureCollection', features: [] };
+      var naechsteId = 1;
+      var werkzeug = null;          // 'linie' | 'freihand' | 'polygon' | 'text' | 'auswahl' | null
+      var entwurf = null;           // { typ, punkte: [[lng, lat], …] } während des Zeichnens
+      var freihandAktiv = false;
+      var ausgewaehlt = null;       // Feature-ID
+      var verlauf = [];             // IDs in Reihenfolge des Anlegens, für Rückgängig
+      var stil = { farbe: FARBEN[0].wert, breite: 3, fuellen: true, deckkraft: 0.3 };
+
+      var Z_QUELLE = 'zeichnung';
+      var Z_ENTWURF = 'entwurf';
+
+      function textGroesse(breite) { return 12 + breite * 2; }
+
+      function legeZeichenLayerAn() {
+        map.addSource(Z_QUELLE, { type: 'geojson', data: zeichnung });
+        map.addSource(Z_ENTWURF, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+
+        map.addLayer({
+          id: 'zeichnung-flaeche', type: 'fill', source: Z_QUELLE,
+          filter: ['==', ['get', 'typ'], 'polygon'],
+          paint: {
+            'fill-color': ['get', 'farbe'],
+            'fill-opacity': ['case', ['boolean', ['get', 'fuellen'], false], ['get', 'deckkraft'], 0]
+          }
+        });
+        map.addLayer({
+          id: 'zeichnung-auswahl', type: 'line', source: Z_QUELLE,
+          filter: false,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#ffffff', 'line-width': ['+', ['get', 'breite'], 6], 'line-opacity': 0.9 }
+        });
+        map.addLayer({
+          id: 'zeichnung-linie', type: 'line', source: Z_QUELLE,
+          filter: ['in', ['get', 'typ'], ['literal', ['linie', 'kurve', 'polygon']]],
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': ['get', 'farbe'], 'line-width': ['get', 'breite'] }
+        });
+        map.addLayer({
+          id: 'zeichnung-auswahl-text', type: 'circle', source: Z_QUELLE,
+          filter: false,
+          paint: { 'circle-radius': 6, 'circle-color': '#ffffff', 'circle-stroke-color': '#0e1116', 'circle-stroke-width': 2 }
+        });
+        map.addLayer({
+          id: 'zeichnung-text', type: 'symbol', source: Z_QUELLE,
+          filter: ['==', ['get', 'typ'], 'text'],
+          layout: {
+            'text-field': ['get', 'text'],
+            'text-font': ['Noto Sans Bold'],
+            'text-size': ['get', 'groesse'],
+            'text-max-width': 20,
+            'text-allow-overlap': true,
+            'text-ignore-placement': true
+          },
+          paint: {
+            'text-color': ['get', 'farbe'],
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 2
+          }
+        });
+
+        map.addLayer({
+          id: 'entwurf-linie', type: 'line', source: Z_ENTWURF,
+          filter: ['==', ['geometry-type'], 'LineString'],
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': ['get', 'farbe'], 'line-width': ['get', 'breite'], 'line-dasharray': [2, 1.5], 'line-opacity': 0.8 }
+        });
+        map.addLayer({
+          id: 'entwurf-punkte', type: 'circle', source: Z_ENTWURF,
+          filter: ['==', ['geometry-type'], 'Point'],
+          paint: { 'circle-radius': 4, 'circle-color': '#ffffff', 'circle-stroke-color': ['get', 'farbe'], 'circle-stroke-width': 2 }
+        });
+
+        aktualisiereZeichnung(false);
+        aktualisiereAuswahl();
+      }
+
+      function aktualisiereZeichnung(speichern) {
+        var quelle = map.getSource(Z_QUELLE);
+        if (quelle) quelle.setData(zeichnung);
+        btnRueckgaengig.disabled = verlauf.length === 0;
+        if (speichern !== false) speichereZeichnung();
+      }
+
+      function aktualisiereEntwurf(cursor) {
+        var quelle = map.getSource(Z_ENTWURF);
+        if (!quelle) return;
+        var features = [];
+        if (entwurf) {
+          var punkte = entwurf.punkte.slice();
+          if (cursor && entwurf.typ !== 'kurve') punkte.push(cursor);
+          if (entwurf.typ === 'polygon' && punkte.length > 2) punkte.push(punkte[0]);
+          if (punkte.length > 1) {
+            features.push({ type: 'Feature', properties: { farbe: stil.farbe, breite: stil.breite }, geometry: { type: 'LineString', coordinates: punkte } });
+          }
+          if (entwurf.typ !== 'kurve') {
+            entwurf.punkte.forEach(function (p) {
+              features.push({ type: 'Feature', properties: { farbe: stil.farbe }, geometry: { type: 'Point', coordinates: p } });
+            });
+          }
+        }
+        quelle.setData({ type: 'FeatureCollection', features: features });
+        btnFertig.hidden = !(entwurf && entwurf.typ !== 'kurve' && entwurf.punkte.length > 0);
+      }
+
+      function rundeKoord(p) {
+        return [Math.round(p[0] * 1e5) / 1e5, Math.round(p[1] * 1e5) / 1e5];
+      }
+
+      function neuesFeature(typ, geometrie, extra) {
+        var props = { typ: typ, farbe: stil.farbe, breite: stil.breite };
+        if (typ === 'polygon') { props.fuellen = stil.fuellen; props.deckkraft = stil.deckkraft; }
+        if (typ === 'text') { props.text = extra.text; props.groesse = textGroesse(stil.breite); }
+        var f = { type: 'Feature', id: naechsteId++, properties: props, geometry: geometrie };
+        zeichnung.features.push(f);
+        verlauf.push(f.id);
+        aktualisiereZeichnung();
+        return f;
+      }
+
+      function findeFeature(id) {
+        for (var i = 0; i < zeichnung.features.length; i++) {
+          if (zeichnung.features[i].id === id) return zeichnung.features[i];
+        }
+        return null;
+      }
+
+      function entferneFeature(id) {
+        zeichnung.features = zeichnung.features.filter(function (f) { return f.id !== id; });
+        verlauf = verlauf.filter(function (v) { return v !== id; });
+        if (ausgewaehlt === id) setAuswahl(null);
+        aktualisiereZeichnung();
+      }
+
+      function schliesseEntwurf() {
+        if (!entwurf) return;
+        var e = entwurf;
+        entwurf = null;
+        aktualisiereEntwurf();
+        var punkte = e.punkte.map(rundeKoord);
+        if (e.typ === 'polygon') {
+          if (punkte.length < 3) { setHinweis('Ein Polygon braucht mindestens drei Punkte.'); return; }
+          punkte.push(punkte[0]);
+          neuesFeature('polygon', { type: 'Polygon', coordinates: [punkte] });
+          setHinweis('Polygon angelegt. Nächstes Polygon: einfach weiterklicken.');
+        } else {
+          if (punkte.length < 2) { setHinweis('Eine Linie braucht mindestens zwei Punkte.'); return; }
+          neuesFeature(e.typ, { type: 'LineString', coordinates: punkte });
+          setHinweis(e.typ === 'kurve' ? 'Freihandlinie angelegt.' : 'Linie angelegt. Nächste Linie: einfach weiterklicken.');
+        }
+      }
+
+      function verwerfeEntwurf() {
+        entwurf = null;
+        aktualisiereEntwurf();
+      }
+
+      function setWerkzeug(neu) {
+        if (entwurf) schliesseEntwurf();
+        if (neu && markierModus) setMarkierModus(false);
+        werkzeug = neu;
+        werkzeugButtons.forEach(function (b) {
+          var an = b.getAttribute('data-werkzeug') === neu;
+          b.classList.toggle('aktiv', an);
+          b.setAttribute('aria-pressed', String(an));
+        });
+        mapEl.classList.toggle('zeichnen', !!neu && neu !== 'auswahl');
+        mapEl.classList.toggle('auswahl', neu === 'auswahl');
+        if (neu !== 'auswahl') setAuswahl(null);
+        if (neu) map.doubleClickZoom.disable(); else map.doubleClickZoom.enable();
+        var hinweise = {
+          linie: 'Punkte anklicken. Doppelklick, Enter oder „Fertig“ beendet die Linie.',
+          freihand: 'Mit gedrückter Maustaste oder dem Finger auf der Karte zeichnen.',
+          polygon: 'Eckpunkte anklicken. Klick auf den ersten Punkt, Enter oder „Fertig“ schließt die Fläche.',
+          text: 'Auf die Stelle klicken, an der der Text stehen soll.',
+          auswahl: 'Zeichnung anklicken. Dann Farbe, Breite oder Füllung ändern, Text ändern oder löschen.'
+        };
+        setHinweis(neu ? hinweise[neu] : '');
+      }
+
+      function setAuswahl(id) {
+        ausgewaehlt = id;
+        aktualisiereAuswahl();
+      }
+
+      function aktualisiereAuswahl() {
+        var f = ausgewaehlt !== null ? findeFeature(ausgewaehlt) : null;
+        if (map.getLayer('zeichnung-auswahl')) {
+          map.setFilter('zeichnung-auswahl', f && f.properties.typ !== 'text' ? ['==', ['id'], f.id] : false);
+          map.setFilter('zeichnung-auswahl-text', f && f.properties.typ === 'text' ? ['==', ['id'], f.id] : false);
+        }
+        btnLoeschen.hidden = !f;
+        btnTextAendern.hidden = !(f && f.properties.typ === 'text');
+        if (f) {
+          // Stilregler auf die Auswahl setzen
+          stil.farbe = f.properties.farbe;
+          stil.breite = f.properties.breite;
+          if (f.properties.typ === 'polygon') stil.fuellen = !!f.properties.fuellen;
+          zeigeStil();
+        }
+      }
+
+      function aendereAuswahl(aenderung) {
+        var f = ausgewaehlt !== null ? findeFeature(ausgewaehlt) : null;
+        if (!f) return false;
+        aenderung(f.properties);
+        if (f.properties.typ === 'text') f.properties.groesse = textGroesse(f.properties.breite);
+        aktualisiereZeichnung();
+        return true;
+      }
+
+      function zeichnenKlick(e) {
+        var lngLat = [e.lngLat.lng, e.lngLat.lat];
+
+        if (werkzeug === 'linie' || werkzeug === 'polygon') {
+          if (!entwurf) entwurf = { typ: werkzeug, punkte: [] };
+          // Polygon: Klick auf den ersten Punkt schließt
+          if (werkzeug === 'polygon' && entwurf.punkte.length >= 3) {
+            var erster = map.project(entwurf.punkte[0]);
+            if (Math.hypot(erster.x - e.point.x, erster.y - e.point.y) < 10) { schliesseEntwurf(); return; }
+          }
+          entwurf.punkte.push(lngLat);
+          aktualisiereEntwurf();
+          return;
+        }
+
+        if (werkzeug === 'text') {
+          var text = window.prompt('Text für diese Stelle:', '');
+          if (text === null) return;
+          text = text.trim();
+          if (!text) return;
+          neuesFeature('text', { type: 'Point', coordinates: rundeKoord(lngLat) }, { text: text });
+          setHinweis('Text gesetzt.');
+          return;
+        }
+
+        if (werkzeug === 'auswahl') {
+          var t = 6;
+          var box = [[e.point.x - t, e.point.y - t], [e.point.x + t, e.point.y + t]];
+          var treffer = map.queryRenderedFeatures(box, { layers: ['zeichnung-text', 'zeichnung-linie', 'zeichnung-flaeche'] });
+          if (treffer.length) {
+            setAuswahl(treffer[0].id);
+            var f = findeFeature(treffer[0].id);
+            var namen = { linie: 'Linie', kurve: 'Freihandlinie', polygon: 'Polygon', text: 'Text' };
+            setHinweis((f ? namen[f.properties.typ] : 'Zeichnung') + ' ausgewählt.');
+          } else {
+            setAuswahl(null);
+            setHinweis('Nichts ausgewählt.');
+          }
+        }
+      }
+
+      function zeichnenDoppelklick(e) {
+        if (!entwurf || (werkzeug !== 'linie' && werkzeug !== 'polygon')) return;
+        e.preventDefault();
+        // Der Doppelklick hat den letzten Punkt doppelt eingetragen
+        var p = entwurf.punkte;
+        if (p.length >= 2 && p[p.length - 1][0] === p[p.length - 2][0] && p[p.length - 1][1] === p[p.length - 2][1]) p.pop();
+        schliesseEntwurf();
+      }
+
+      function freihandStart(e) {
+        if (werkzeug !== 'freihand') return;
+        if (e.originalEvent && e.originalEvent.touches && e.originalEvent.touches.length > 1) return;
+        e.preventDefault();   // verhindert das Verschieben der Karte
+        freihandAktiv = true;
+        entwurf = { typ: 'kurve', punkte: [[e.lngLat.lng, e.lngLat.lat]], letzterPunkt: e.point };
+        aktualisiereEntwurf();
+      }
+
+      function freihandBewegung(e) {
+        if (!freihandAktiv || !entwurf) return;
+        if (e.originalEvent && e.originalEvent.touches && e.originalEvent.touches.length > 1) return;
+        var d = Math.hypot(e.point.x - entwurf.letzterPunkt.x, e.point.y - entwurf.letzterPunkt.y);
+        if (d < 3) return;
+        entwurf.punkte.push([e.lngLat.lng, e.lngLat.lat]);
+        entwurf.letzterPunkt = e.point;
+        aktualisiereEntwurf();
+      }
+
+      function freihandEnde() {
+        if (!freihandAktiv) return;
+        freihandAktiv = false;
+        schliesseEntwurf();
+      }
+
+      // Zeichnungen kompakt in die URL: [typ, farbe, breite, fuellen, deckkraft, text, koordinaten]
+      var speicherTimer = null;
+      function speichereZeichnung() {
+        clearTimeout(speicherTimer);
+        speicherTimer = setTimeout(function () {
+          if (!zeichnung.features.length) { schreibeHashParam('z', ''); return; }
+          var kompakt = zeichnung.features.map(function (f) {
+            var p = f.properties;
+            var koords = f.geometry.type === 'Polygon' ? f.geometry.coordinates[0] : f.geometry.coordinates;
+            return [p.typ[0], p.farbe, p.breite, p.fuellen ? 1 : 0, p.deckkraft || 0, p.text || '', koords];
+          });
+          packeText(JSON.stringify(kompakt)).then(function (kodiert) {
+            schreibeHashParam('z', kodiert);
+          });
+        }, 150);
+      }
+
+      function ladeZeichnung(kodiert) {
+        if (!kodiert) return Promise.resolve();
+        return entpackeText(kodiert).then(function (text) {
+          var liste = JSON.parse(text);
+          var typen = { l: 'linie', k: 'kurve', p: 'polygon', t: 'text' };
+          liste.forEach(function (e) {
+            var typ = typen[e[0]];
+            if (!typ || !Array.isArray(e[6])) return;
+            var props = { typ: typ, farbe: String(e[1]), breite: Number(e[2]) || 3 };
+            var geometrie;
+            if (typ === 'polygon') {
+              props.fuellen = !!e[3];
+              props.deckkraft = Number(e[4]) || 0.3;
+              geometrie = { type: 'Polygon', coordinates: [e[6]] };
+            } else if (typ === 'text') {
+              props.text = String(e[5]);
+              props.groesse = textGroesse(props.breite);
+              geometrie = { type: 'Point', coordinates: e[6] };
+            } else {
+              geometrie = { type: 'LineString', coordinates: e[6] };
+            }
+            zeichnung.features.push({ type: 'Feature', id: naechsteId++, properties: props, geometry: geometrie });
+          });
+        }).catch(function (err) {
+          setHinweis('Zeichnungen aus dem Link konnten nicht geladen werden: ' + err.message);
+        });
+      }
+
       // ---------- Werkzeugleiste ----------
+
+      function zeigeStil() {
+        var index = -1;
+        FARBEN.forEach(function (f, i) { if (f.wert.toLowerCase() === stil.farbe.toLowerCase()) index = i; });
+        Array.prototype.forEach.call(farbenEl.children, function (el, j) { el.classList.toggle('aktiv', j === index); });
+        farbeEigenLabel.classList.toggle('aktiv', index === -1);
+        if (index === -1) farbeEigen.value = stil.farbe;
+        breiteEl.value = stil.breite;
+        breiteWertEl.textContent = stil.breite;
+        btnFuellen.classList.toggle('aktiv', stil.fuellen);
+        btnFuellen.setAttribute('aria-pressed', String(stil.fuellen));
+      }
+
+      function waehleFarbe(wert, index) {
+        stil.farbe = wert;
+        if (index !== undefined) aktiveFarbe = index;
+        zeigeStil();
+        aendereAuswahl(function (p) { p.farbe = wert; });
+        // Ohne aktives Werkzeug und ohne Auswahl: Farbe gilt für das Gewässer-Markieren
+        if (!werkzeug && !markierModus && index !== undefined) setMarkierModus(true);
+      }
 
       FARBEN.forEach(function (f, i) {
         var b = document.createElement('button');
@@ -582,17 +1081,56 @@
         b.style.background = f.wert;
         b.title = f.name;
         b.setAttribute('aria-label', 'Farbe ' + f.name);
-        b.addEventListener('click', function () {
-          aktiveFarbe = i;
-          Array.prototype.forEach.call(farbenEl.children, function (el, j) {
-            el.classList.toggle('aktiv', j === i);
-          });
-          if (!markierModus) setMarkierModus(true);
-        });
+        b.addEventListener('click', function () { waehleFarbe(f.wert, i); });
         farbenEl.appendChild(b);
       });
 
+      farbeEigen.addEventListener('input', function () { waehleFarbe(farbeEigen.value); });
+
+      breiteEl.addEventListener('input', function () {
+        stil.breite = parseInt(breiteEl.value, 10) || 1;
+        breiteWertEl.textContent = stil.breite;
+        aendereAuswahl(function (p) { p.breite = stil.breite; });
+        if (entwurf) aktualisiereEntwurf();
+      });
+
+      btnFuellen.addEventListener('click', function () {
+        stil.fuellen = !stil.fuellen;
+        zeigeStil();
+        aendereAuswahl(function (p) { if (p.typ === 'polygon') p.fuellen = stil.fuellen; });
+      });
+
+      werkzeugButtons.forEach(function (b) {
+        b.addEventListener('click', function () {
+          var w = b.getAttribute('data-werkzeug');
+          setWerkzeug(werkzeug === w ? null : w);
+        });
+      });
+
+      btnFertig.addEventListener('click', function () { schliesseEntwurf(); });
+
+      btnRueckgaengig.addEventListener('click', function () {
+        if (entwurf) { verwerfeEntwurf(); setHinweis('Entwurf verworfen.'); return; }
+        var id = verlauf[verlauf.length - 1];
+        if (id !== undefined) { entferneFeature(id); setHinweis('Letzte Zeichnung entfernt.'); }
+      });
+
+      btnLoeschen.addEventListener('click', function () {
+        if (ausgewaehlt !== null) { entferneFeature(ausgewaehlt); setHinweis('Zeichnung gelöscht.'); }
+      });
+
+      btnTextAendern.addEventListener('click', function () {
+        var f = ausgewaehlt !== null ? findeFeature(ausgewaehlt) : null;
+        if (!f || f.properties.typ !== 'text') return;
+        var text = window.prompt('Neuer Text:', f.properties.text);
+        if (text === null) return;
+        text = text.trim();
+        if (!text) return;
+        aendereAuswahl(function (p) { p.text = text; });
+      });
+
       function setMarkierModus(an) {
+        if (an && werkzeug) setWerkzeug(null);
         markierModus = an;
         btnMarkieren.classList.toggle('aktiv', an);
         btnMarkieren.setAttribute('aria-pressed', String(an));
@@ -603,7 +1141,7 @@
       btnMarkieren.addEventListener('click', function () { setMarkierModus(!markierModus); });
 
       function zeigeModus() {
-        btnModus.textContent = nurRahmen ? 'Rahmen' : 'Füllung';
+        btnModus.textContent = nurRahmen ? 'Umrandet' : 'Gefüllt';
         btnModus.classList.toggle('aktiv', nurRahmen);
       }
       btnModus.addEventListener('click', function () {
@@ -617,12 +1155,12 @@
         markierungen.flaechen = {};
         markierungen.linien = {};
         wendeMarkierungenAn();
-        setHinweis('Markierungen entfernt.');
+        setHinweis('Gewässer-Markierungen entfernt.');
       });
 
       btnLink.addEventListener('click', function () {
         var url = window.location.href;
-        var fertig = function () { setHinweis('Link kopiert: ' + url); };
+        var fertig = function () { setHinweis('Link kopiert (' + Math.round(url.length / 100) / 10 + ' kB).'); };
         var fehlgeschlagen = function () { setHinweis('Kopieren nicht möglich – Adresse aus der Adresszeile nehmen.'); };
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(url).then(fertig, fehlgeschlagen);
@@ -631,8 +1169,93 @@
         }
       });
 
+      document.getElementById('btn-zuklappen').addEventListener('click', function () {
+        var leiste = document.getElementById('leiste');
+        var zu = leiste.classList.toggle('zu');
+        this.textContent = zu ? 'Werkzeuge' : '–';
+      });
+
       document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && markierModus) setMarkierModus(false);
+        var ziel = e.target;
+        if (ziel && (ziel.tagName === 'INPUT' || ziel.tagName === 'TEXTAREA')) return;
+        if (e.key === 'Escape') {
+          if (entwurf) { verwerfeEntwurf(); setHinweis('Entwurf verworfen.'); }
+          else if (werkzeug) setWerkzeug(null);
+          else if (markierModus) setMarkierModus(false);
+        } else if (e.key === 'Enter' && entwurf) {
+          e.preventDefault();
+          schliesseEntwurf();
+        } else if ((e.key === 'Delete' || e.key === 'Backspace') && ausgewaehlt !== null) {
+          e.preventDefault();
+          entferneFeature(ausgewaehlt);
+          setHinweis('Zeichnung gelöscht.');
+        }
+      });
+
+      // ---------- Export / Import (GeoJSON) ----------
+
+      document.getElementById('btn-export').addEventListener('click', function () {
+        var daten = {
+          type: 'FeatureCollection',
+          features: zeichnung.features,
+          markierungen: markierungen,
+          ausschnitt: { center: [map.getCenter().lng, map.getCenter().lat], zoom: map.getZoom() }
+        };
+        var blob = new Blob([JSON.stringify(daten, null, 1)], { type: 'application/geo+json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'karte-' + new Date().toISOString().slice(0, 10) + '.geojson';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+        setHinweis('GeoJSON gespeichert: ' + a.download);
+      });
+
+      var importDatei = document.getElementById('import-datei');
+      document.getElementById('btn-import').addEventListener('click', function () { importDatei.click(); });
+      importDatei.addEventListener('change', function () {
+        var datei = importDatei.files && importDatei.files[0];
+        if (!datei) return;
+        var leser = new FileReader();
+        leser.onload = function () {
+          try {
+            var daten = JSON.parse(leser.result);
+            var features = daten.type === 'FeatureCollection' ? daten.features : (daten.type === 'Feature' ? [daten] : []);
+            var anzahl = 0;
+            features.forEach(function (f) {
+              if (!f || !f.geometry) return;
+              var g = f.geometry, p = f.properties || {};
+              var typ = p.typ;
+              if (g.type === 'LineString') typ = typ === 'kurve' ? 'kurve' : 'linie';
+              else if (g.type === 'Polygon') typ = 'polygon';
+              else if (g.type === 'Point') { if (!p.text && !p.name) return; typ = 'text'; }
+              else return;
+              var props = { typ: typ, farbe: p.farbe || stil.farbe, breite: Number(p.breite) || stil.breite };
+              if (typ === 'polygon') { props.fuellen = p.fuellen !== undefined ? !!p.fuellen : stil.fuellen; props.deckkraft = Number(p.deckkraft) || stil.deckkraft; }
+              if (typ === 'text') { props.text = String(p.text || p.name); props.groesse = textGroesse(props.breite); }
+              var feature = { type: 'Feature', id: naechsteId++, properties: props, geometry: g };
+              zeichnung.features.push(feature);
+              verlauf.push(feature.id);
+              anzahl++;
+            });
+            if (daten.markierungen) {
+              markierungen.flaechen = daten.markierungen.flaechen || {};
+              markierungen.linien = daten.markierungen.linien || {};
+              wendeMarkierungenAn();
+            }
+            aktualisiereZeichnung();
+            if (daten.ausschnitt && daten.ausschnitt.center) {
+              map.easeTo({ center: daten.ausschnitt.center, zoom: daten.ausschnitt.zoom || map.getZoom() });
+            }
+            setHinweis(anzahl + ' Zeichnung(en) geladen.');
+          } catch (err) {
+            setHinweis('Datei konnte nicht gelesen werden: ' + err.message);
+          }
+          importDatei.value = '';
+        };
+        leser.readAsText(datei);
       });
 
       // ---------- Screenshot und Druck ----------
@@ -737,14 +1360,33 @@
 
       // ---------- Start ----------
 
-      leseMarkierungenAusUrl();
+      leseMarkierungen(startParams.g);
+      var zeichnungGeladen = ladeZeichnung(startParams.z);
+      zeigeStil();
 
       map.on('style.load', function () {
         betoneGewaesser();
+        deutscheBeschriftung();
         legeMarkierLayerAn();
+        legeZeichenLayerAn();
+        zeichnungGeladen.then(function () { aktualisiereZeichnung(false); });
       });
 
-      map.on('click', klickAufKarte);
+      map.on('click', function (e) {
+        if (werkzeug) { zeichnenKlick(e); return; }
+        if (markierModus) markierKlick(e);
+      });
+      map.on('dblclick', zeichnenDoppelklick);
+      map.on('mousemove', function (e) {
+        if (freihandAktiv) { freihandBewegung(e); return; }
+        if (entwurf && entwurf.typ !== 'kurve') aktualisiereEntwurf([e.lngLat.lng, e.lngLat.lat]);
+      });
+      map.on('mousedown', freihandStart);
+      map.on('mouseup', freihandEnde);
+      map.on('touchstart', freihandStart);
+      map.on('touchmove', freihandBewegung);
+      map.on('touchend', freihandEnde);
+      map.on('touchcancel', freihandEnde);
 
       map.on('load', function () {
         if (ausschnittAusUrl) {
