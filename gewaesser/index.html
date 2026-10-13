@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>gewaesser — FV Wangen</title>
+  <meta name="description" content="Gewässer des FV Wangen auf einer Karte: Bachabschnitte, befischte Weiher, Zugangspunkte mit Navigation." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='2' fill='%230e1116'/%3E%3Cpath d='M3 6c2-2 3 2 5 0s3 2 5 0M3 10c2-2 3 2 5 0s3 2 5 0' fill='none' stroke='%237cc7e8' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E" />
+
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" />
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+
+  <style>
+    :root {
+      --grund: #0e1116;
+      --text: #c9ccd1;
+      --hell: #f2f4f6;
+      --dim: #7d8590;
+      --link: #7cc7e8;
+      --prompt: #79c07a;
+      --warn: #e0af68;
+      --fehler: #f7768e;
+      --linie: #262c34;
+      --gewaesser: #1f6feb;
+      --unsicher: #e8833a;
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      background: #f4f4f2; /* Positron-Hintergrund, bis der Style geladen ist */
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    #map {
+      position: fixed;
+      inset: 0;
+    }
+
+    /* Seitenleiste links: Prompt, Status, Gewässerliste – im Terminal-Look der Startseite */
+    .hud {
+      position: fixed;
+      top: max(10px, env(safe-area-inset-top));
+      left: max(10px, env(safe-area-inset-left));
+      bottom: max(40px, calc(env(safe-area-inset-bottom) + 40px));
+      z-index: 5;
+      width: min(92vw, 42ch);
+      display: flex;
+      flex-direction: column;
+      background: rgba(14, 17, 22, 0.92);
+      color: var(--text);
+      border-radius: 6px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+    }
+
+    .hud .kopf { padding: 8px 12px 6px; position: relative; }
+
+    .hud .verein {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 28px 8px 0;
+      color: var(--dim);
+      line-height: 1.35;
+    }
+    .hud .verein img { flex: none; display: block; }
+    .hud .verein b { color: var(--hell); font-size: 15px; letter-spacing: 0.04em; }
+    .hud.zu .verein img { width: 30px; height: auto; }
+
+    .hud .status { margin: 0; color: var(--text); white-space: pre-wrap; }
+    .hud .status.fehler { color: var(--fehler); }
+
+    .hud button {
+      font: inherit;
+      color: var(--text);
+      background: transparent;
+      border: 1px solid var(--linie);
+      border-radius: 4px;
+      padding: 3px 8px;
+      cursor: pointer;
+      line-height: 1.3;
+    }
+    .hud button:hover, .hud button:focus-visible { color: var(--hell); border-color: var(--dim); outline: none; }
+    .hud button.aktiv { color: var(--hell); border-color: var(--prompt); }
+
+    .hud .zuklappen {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .hud .filter {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 6px 12px 8px;
+      border-bottom: 1px solid var(--linie);
+    }
+
+    .hud .legende {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 14px;
+      padding: 6px 12px;
+      color: var(--dim);
+      border-bottom: 1px solid var(--linie);
+    }
+    .legende .strich { display: inline-block; width: 18px; height: 0; border-top: 3px solid var(--gewaesser); vertical-align: middle; margin-right: 6px; }
+    .legende .strich.unsicher { border-top: 3px dashed var(--unsicher); }
+    .legende .strich.regel { border-top: 3px dashed #3fae5a; }
+    .legende .feld { display: inline-block; width: 14px; height: 10px; vertical-align: middle; margin-right: 6px; border: 1.5px solid; }
+    .legende .feld.zucht { background: rgba(138, 143, 152, 0.45); border-color: #8a8f98; border-style: dashed; }
+    .legende .feld.verbot { background: rgba(215, 38, 61, 0.4); border-color: #d7263d; }
+    .legende .p {
+      display: inline-block; width: 15px; height: 15px; margin-right: 6px; border-radius: 50%;
+      background: #16325c; color: #fff; font: 700 10px/15px system-ui, sans-serif; text-align: center; vertical-align: middle;
+    }
+    .liste .gruppe .dim { color: var(--dim); font-weight: 400; letter-spacing: 0; text-transform: none; }
+
+    .liste {
+      list-style: none;
+      margin: 0;
+      padding: 4px 0 8px;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .liste .gruppe {
+      padding: 8px 12px 2px;
+      color: var(--hell);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .liste button.eintrag {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: 0;
+      border-radius: 0;
+      padding: 4px 12px;
+    }
+    .liste button.eintrag:hover, .liste button.eintrag:focus-visible { background: #1a1f26; }
+    .liste button.eintrag.aktiv { background: #1a2633; color: var(--hell); }
+    .liste .name { color: var(--hell); }
+    .liste .abschnitt { display: block; color: var(--dim); }
+    .liste .marke { color: var(--unsicher); }
+
+    .hud.zu { bottom: auto; }
+    .hud.zu .filter, .hud.zu .legende, .hud.zu .liste, .hud.zu .status { display: none; }
+
+    /* Popup im gleichen Look */
+    .maplibregl-popup-content {
+      background: rgba(14, 17, 22, 0.95);
+      color: var(--text);
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12.5px;
+      line-height: 1.5;
+      border-radius: 6px;
+      padding: 10px 26px 10px 12px;
+      max-width: 34ch;
+    }
+    .maplibregl-popup-close-button { color: var(--dim); font-size: 18px; padding: 0 6px; }
+    .maplibregl-popup-close-button:hover { color: var(--hell); background: transparent; }
+    .maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color: rgba(14, 17, 22, 0.95); }
+    .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: rgba(14, 17, 22, 0.95); }
+    .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: rgba(14, 17, 22, 0.95); }
+    .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: rgba(14, 17, 22, 0.95); }
+
+    .popup h3 { margin: 0 0 2px; font-size: inherit; color: var(--hell); }
+    .popup p { margin: 4px 0 0; }
+    .popup .dim { color: var(--dim); }
+    .popup .unsicher { color: var(--unsicher); }
+    .popup .gefunden { color: var(--prompt); }
+    .popup a { color: var(--link); text-underline-offset: 3px; }
+    .popup a:hover { color: var(--hell); }
+    .popup .verbot { color: var(--fehler); font-weight: 700; }
+    .popup .medien { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 8px; }
+    .popup .medien a { position: relative; display: block; }
+    .popup .medien img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 3px; }
+    .popup .medien .play::after {
+      content: '▶'; position: absolute; inset: 0; display: grid; place-items: center;
+      color: #fff; font-size: 22px; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+    }
+    .popup .parkplaetze a { margin-right: 8px; white-space: nowrap; }
+
+    .banner {
+      position: fixed;
+      left: 50%;
+      bottom: max(90px, calc(env(safe-area-inset-bottom) + 90px));
+      transform: translateX(-50%);
+      z-index: 6;
+      max-width: 92vw;
+      background: rgba(14, 17, 22, 0.94);
+      color: var(--fehler);
+      border-radius: 6px;
+      padding: 8px 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      display: none;
+    }
+    .banner.sichtbar { display: block; }
+
+    /* Großansicht für Fotos und eingebettete Videos */
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+      background: rgba(8, 10, 14, 0.88);
+    }
+    .lightbox .inhalt { width: min(100%, 1100px); }
+    .lightbox img { display: block; max-width: 100%; max-height: 85vh; margin: 0 auto; border-radius: 4px; }
+    .lightbox iframe { display: block; width: 100%; aspect-ratio: 16 / 9; max-height: 85vh; border: 0; border-radius: 4px; background: #000; }
+    .lightbox .leiste-oben { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    .lightbox a { color: var(--link); }
+    .lightbox button {
+      font: inherit; color: var(--text); background: transparent; cursor: pointer;
+      border: 1px solid var(--linie); border-radius: 4px; padding: 3px 10px;
+    }
+    .lightbox button:hover, .lightbox button:focus-visible { color: var(--hell); border-color: var(--dim); outline: none; }
+
+    .maplibregl-ctrl-group { border-radius: 6px; }
+    .maplibregl-ctrl-attrib { font-family: system-ui, sans-serif; }
+
+    @media (max-width: 560px) {
+      body { font-size: 12px; }
+      .hud { bottom: auto; max-height: 55vh; }
+      .hud .kopf { padding: 6px 10px 4px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="map" role="application" aria-label="Karte der Vereinsgewässer"></div>
+
+  <aside class="hud" id="hud">
+    <div class="kopf">
+      <div class="verein">
+        <img src="fv-wangen-logo.png" alt="Logo Fischereiverein Wangen im Allgäu e.V." width="44" height="57" />
+        <span><b>Gewässer</b><br />Fischereiverein Wangen im Allgäu e.V.</span>
+      </div>
+      <button type="button" class="zuklappen" id="btn-zuklappen" title="Liste ein-/ausklappen" aria-label="Liste ein-/ausklappen" aria-expanded="true">–</button>
+      <p class="status" id="status" aria-live="polite">Gewässer werden geladen …</p>
+    </div>
+
+    <div class="filter" role="group" aria-label="Anzeige">
+      <button type="button" id="btn-fliess" class="aktiv" aria-pressed="true">Fließgewässer</button>
+      <button type="button" id="btn-still" class="aktiv" aria-pressed="true">Weiher</button>
+      <button type="button" id="btn-park" class="aktiv" aria-pressed="true">Parkplätze</button>
+      <button type="button" id="btn-alle" title="Alle Gewässer ins Bild holen">Alle zeigen</button>
+      <button type="button" id="btn-kml" title="KML-Datei für den Import in Google My Maps">KML</button>
+    </div>
+
+    <div class="legende">
+      <span><span class="strich" aria-hidden="true"></span>gesichert</span>
+      <span id="legende-unsicher" hidden><span class="strich unsicher" aria-hidden="true"></span>Lage/Grenze geschätzt</span>
+      <span><span class="feld zucht" aria-hidden="true"></span>Zucht-/Hälterweiher, kein Angeln</span>
+      <span><span class="feld verbot" aria-hidden="true"></span>Angelverbot</span>
+      <span><span class="strich regel" aria-hidden="true"></span>nur rechte Seite</span>
+      <span><span class="p" aria-hidden="true">P</span>Parkplatz</span>
+    </div>
+
+    <ul class="liste" id="liste"></ul>
+  </aside>
+
+  <div class="banner" id="banner" role="alert"></div>
+
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Großansicht" hidden>
+    <div class="inhalt">
+      <div class="leiste-oben">
+        <a id="lightbox-extern" href="#" target="_blank" rel="noopener"></a>
+        <button type="button" id="lightbox-zu">Schließen ✕</button>
+      </div>
+      <div id="lightbox-medium"></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
+      var DATEN_URL = 'gewaesser.geojson';
+      var KML_URL = 'gewaesser.kml';
+
+      // Ausschnitt Wangen im Allgäu, bis die Daten geladen sind
+      var START = { center: [9.83, 47.70], zoom: 11 };
+
+      var FARBE = '#1f6feb';
+      var FARBE_UNSICHER = '#e8833a';
+      var FARBE_ZUCHT = '#8a8f98';
+      var FARBE_VERBOT = '#d7263d';
+      var FARBE_REGEL = '#3fae5a';
+      var FARBE_PARK = '#16325c';
+
+      var statusEl = document.getElementById('status');
+      var bannerEl = document.getElementById('banner');
+      var listeEl = document.getElementById('liste');
+      var hudEl = document.getElementById('hud');
+      var btnZuklappen = document.getElementById('btn-zuklappen');
+      var btnFliess = document.getElementById('btn-fliess');
+      var btnStill = document.getElementById('btn-still');
+      var btnPark = document.getElementById('btn-park');
+      var btnAlle = document.getElementById('btn-alle');
+      var btnKml = document.getElementById('btn-kml');
+
+      function setStatus(text, art) {
+        statusEl.textContent = text;
+        statusEl.className = 'status' + (art ? ' ' + art : '');
+      }
+
+      function zeigeBanner(text) {
+        bannerEl.textContent = text;
+        bannerEl.classList.add('sichtbar');
+      }
+
+      if (typeof maplibregl === 'undefined') {
+        setStatus('Kartenbibliothek konnte nicht geladen werden.', 'fehler');
+        zeigeBanner('MapLibre GL JS ist nicht erreichbar (CDN blockiert oder offline).');
+        return;
+      }
+
+      // ---------- Karte ----------
+
+      // MapLibre schreibt den Ausschnitt sofort in den Hash; vorher merken, ob ein Link einen mitbrachte
+      var ausschnittAusUrl = /(^#|&)k=/.test(window.location.hash);
+
+      var map = new maplibregl.Map({
+        container: 'map',
+        style: STYLE_URL,
+        center: START.center,
+        zoom: START.zoom,
+        hash: 'k',
+        attributionControl: { compact: false },
+        locale: {
+          'NavigationControl.ZoomIn': 'Hineinzoomen',
+          'NavigationControl.ZoomOut': 'Herauszoomen',
+          'NavigationControl.ResetBearing': 'Nach Norden ausrichten',
+          'GeolocateControl.FindMyLocation': 'Eigenen Standort anzeigen',
+          'GeolocateControl.LocationNotAvailable': 'Standort nicht verfügbar',
+          'ScaleControl.Meters': 'm',
+          'ScaleControl.Kilometers': 'km',
+          'AttributionControl.ToggleAttribution': 'Quellenangaben ein-/ausblenden',
+          'Map.Title': 'Karte. Mit Pfeiltasten verschieben, Plus und Minus zoomen.'
+        }
+      });
+
+      // Zum Ausprobieren in der Browser-Konsole
+      window.karte = map;
+
+      map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right');
+      map.addControl(new maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true, timeout: 15000 },
+        trackUserLocation: true
+      }), 'top-right');
+      map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
+
+      // Positron beschriftet mit englischen Namen (name_en)
+      function deutscheBeschriftung() {
+        var deutsch = ['coalesce', ['get', 'name_de'], ['get', 'name:de'], ['get', 'name:latin'], ['get', 'name']];
+        map.getStyle().layers.forEach(function (layer) {
+          if (layer.type !== 'symbol' || !layer.layout || !layer.layout['text-field']) return;
+          if (JSON.stringify(layer.layout['text-field']).indexOf('name') === -1) return;
+          map.setLayoutProperty(layer.id, 'text-field', deutsch);
+        });
+      }
+
+      // ---------- Daten ----------
+
+      // gewaesser.geojson, Feature-Arten (properties.kind):
+      //   fliess/still  Gewässer; befischt=false sind Zucht-/Hälterweiher
+      //   punkt         Beschriftung + Klickziel je Gewässer
+      //   parkplatz, verbot, regel, info, weg  aus der Vereinskarte, je mit properties.gewaesser
+      // status "geschätzt": Zuordnung oder Abschnittsgrenze nur aus OSM abgeleitet, vor Ort prüfen.
+      var daten = null;
+      var gewaesser = [];        // je Gewässer: { name, kind, p, bounds }
+      var popup = null;
+
+      function istUnsicher(p) { return p.status !== 'gefunden'; }
+
+      function farbAusdruck() {
+        return ['case',
+          ['==', ['get', 'befischt'], false], FARBE_ZUCHT,
+          ['==', ['get', 'status'], 'gefunden'], FARBE,
+          FARBE_UNSICHER];
+      }
+
+      function grenzen(geometrie) {
+        var b = new maplibregl.LngLatBounds();
+        (function lauf(c) {
+          if (typeof c[0] === 'number') { b.extend(c); return; }
+          c.forEach(lauf);
+        })(geometrie.coordinates);
+        return b;
+      }
+
+      var art = function (k) { return ['==', ['get', 'kind'], k]; };
+      var istFlaeche = ['==', ['geometry-type'], 'Polygon'];
+      var istLinie = ['==', ['geometry-type'], 'LineString'];
+
+      function legeLayerAn() {
+        if (!daten || map.getSource('gewaesser')) return;
+        map.addSource('gewaesser', { type: 'geojson', data: daten, attribution: 'Gewässer: FV Wangen, © OpenStreetMap-Mitwirkende' });
+
+        map.addLayer({
+          id: 'still-flaeche', type: 'fill', source: 'gewaesser', filter: art('still'),
+          paint: { 'fill-color': farbAusdruck(), 'fill-opacity': ['case', ['==', ['get', 'befischt'], false], 0.45, 0.35] }
+        });
+        map.addLayer({
+          id: 'still-rand', type: 'line', source: 'gewaesser',
+          filter: ['all', art('still'), ['!=', ['get', 'befischt'], false]],
+          paint: { 'line-color': farbAusdruck(), 'line-width': 2 }
+        });
+        map.addLayer({
+          id: 'zucht-rand', type: 'line', source: 'gewaesser',
+          filter: ['all', art('still'), ['==', ['get', 'befischt'], false]],
+          paint: { 'line-color': FARBE_ZUCHT, 'line-width': 2, 'line-dasharray': [2, 1.5] }
+        });
+        // Heller Untergrund, damit die Abschnitte über Positron herausstechen
+        map.addLayer({
+          id: 'fliess-halo', type: 'line', source: 'gewaesser', filter: art('fliess'),
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#ffffff', 'line-opacity': 0.8, 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 6, 15, 12] }
+        });
+        map.addLayer({
+          id: 'fliess-gesichert', type: 'line', source: 'gewaesser',
+          filter: ['all', art('fliess'), ['==', ['get', 'status'], 'gefunden']],
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': FARBE, 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 15, 7] }
+        });
+        map.addLayer({
+          id: 'fliess-unsicher', type: 'line', source: 'gewaesser',
+          filter: ['all', art('fliess'), ['!=', ['get', 'status'], 'gefunden']],
+          layout: { 'line-join': 'round' },
+          paint: { 'line-color': FARBE_UNSICHER, 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 15, 7], 'line-dasharray': [2, 1] }
+        });
+        map.addLayer({
+          id: 'regel', type: 'line', source: 'gewaesser', filter: art('regel'),
+          paint: { 'line-color': FARBE_REGEL, 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 15, 6], 'line-dasharray': [1.5, 1.2] }
+        });
+        map.addLayer({
+          id: 'weg', type: 'line', source: 'gewaesser', filter: art('weg'), minzoom: 12,
+          paint: { 'line-color': '#8b5a2b', 'line-width': 2.5, 'line-dasharray': [1, 1] }
+        });
+        map.addLayer({
+          id: 'verbot-flaeche', type: 'fill', source: 'gewaesser', filter: ['all', art('verbot'), istFlaeche],
+          paint: { 'fill-color': FARBE_VERBOT, 'fill-opacity': 0.4 }
+        });
+        map.addLayer({
+          id: 'verbot-linie', type: 'line', source: 'gewaesser', filter: art('verbot'),
+          paint: {
+            'line-color': FARBE_VERBOT,
+            'line-width': ['case', istLinie, 4, 1.5],
+            'line-dasharray': [2, 1]
+          }
+        });
+        map.addLayer({
+          id: 'zugang', type: 'circle', source: 'gewaesser', filter: art('punkt'), maxzoom: 12,
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 4, 12, 6],
+            'circle-color': farbAusdruck(),
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': 2
+          }
+        });
+        map.addLayer({
+          id: 'info', type: 'circle', source: 'gewaesser', filter: art('info'), minzoom: 12,
+          paint: { 'circle-radius': 4.5, 'circle-color': '#ffffff', 'circle-stroke-color': '#3b4250', 'circle-stroke-width': 2 }
+        });
+        map.addLayer({
+          id: 'parkplatz', type: 'circle', source: 'gewaesser', filter: art('parkplatz'), minzoom: 11.5,
+          paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 7, 16, 10], 'circle-color': FARBE_PARK, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5 }
+        });
+        map.addLayer({
+          id: 'parkplatz-p', type: 'symbol', source: 'gewaesser', filter: art('parkplatz'), minzoom: 11.5,
+          layout: { 'text-field': 'P', 'text-font': ['Noto Sans Bold'], 'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 13], 'text-allow-overlap': true },
+          paint: { 'text-color': '#ffffff' }
+        });
+        map.addLayer({
+          id: 'info-name', type: 'symbol', source: 'gewaesser', filter: art('info'), minzoom: 14,
+          layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 11, 'text-offset': [0, 0.9], 'text-anchor': 'top', 'text-optional': true },
+          paint: { 'text-color': '#3b4250', 'text-halo-color': '#ffffff', 'text-halo-width': 1.4 }
+        });
+        map.addLayer({
+          id: 'zugang-name', type: 'symbol', source: 'gewaesser', filter: art('punkt'), minzoom: 11,
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-font': ['Noto Sans Bold'],
+            'text-size': 12,
+            'text-optional': true
+          },
+          paint: {
+            'text-color': ['case', ['==', ['get', 'befischt'], false], '#4a4f57', '#16325c'],
+            'text-halo-color': '#ffffff', 'text-halo-width': 1.6
+          }
+        });
+
+        wendeFilterAn();
+      }
+
+      // ---------- Filter ----------
+
+      var zeigeFliess = true;
+      var zeigeStill = true;
+      var zeigePark = true;
+
+      var LAYER_FLIESS = ['fliess-halo', 'fliess-gesichert', 'fliess-unsicher'];
+      var LAYER_STILL = ['still-flaeche', 'still-rand', 'zucht-rand'];
+      var LAYER_ZUSATZ = ['regel', 'weg', 'verbot-flaeche', 'verbot-linie', 'info', 'info-name'];
+
+      function wendeFilterAn() {
+        var sicht = function (an) { return an ? 'visible' : 'none'; };
+        var setze = function (ids, an) {
+          ids.forEach(function (id) { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', sicht(an)); });
+        };
+        setze(LAYER_FLIESS, zeigeFliess);
+        setze(LAYER_STILL, zeigeStill);
+        setze(['parkplatz', 'parkplatz-p'], zeigePark);
+
+        var arten = [];
+        if (zeigeFliess) arten.push('Fließgewässer');
+        if (zeigeStill) arten.push('Stillgewässer');
+        var nachTyp = ['in', ['get', 'typ'], ['literal', arten]];
+        if (map.getLayer('zugang')) {
+          map.setFilter('zugang', ['all', art('punkt'), nachTyp]);
+          map.setFilter('zugang-name', ['all', art('punkt'), nachTyp]);
+          map.setFilter('parkplatz', ['all', art('parkplatz'), nachTyp]);
+          map.setFilter('parkplatz-p', ['all', art('parkplatz'), nachTyp]);
+          LAYER_ZUSATZ.forEach(function (id) {
+            var k = id.split('-')[0];
+            var f = ['all', art(k), nachTyp];
+            if (id === 'verbot-flaeche') f.push(istFlaeche);
+            map.setFilter(id, f);
+          });
+        }
+        Array.prototype.forEach.call(listeEl.querySelectorAll('[data-kind]'), function (el) {
+          el.hidden = el.getAttribute('data-kind') === 'fliess' ? !zeigeFliess : !zeigeStill;
+        });
+      }
+
+      function schalter(btn, setze) {
+        btn.addEventListener('click', function () {
+          var an = !btn.classList.contains('aktiv');
+          btn.classList.toggle('aktiv', an);
+          btn.setAttribute('aria-pressed', String(an));
+          setze(an);
+          wendeFilterAn();
+        });
+      }
+      schalter(btnFliess, function (an) { zeigeFliess = an; });
+      schalter(btnStill, function (an) { zeigeStill = an; });
+      schalter(btnPark, function (an) { zeigePark = an; });
+
+      // ---------- Popup und Liste ----------
+
+      function esc(text) {
+        var d = document.createElement('div');
+        d.textContent = text == null ? '' : String(text);
+        return d.innerHTML;
+      }
+
+      function medienHtml(fotos, videos) {
+        var teile = (fotos || []).map(function (src) {
+          return '<a href="' + esc(src) + '" data-foto="' + esc(src) + '" target="_blank" rel="noopener"><img src="' + esc(src) + '" alt="Foto" loading="lazy" /></a>';
+        }).concat((videos || []).map(function (id) {
+          return '<a class="play" href="https://www.youtube.com/watch?v=' + esc(id) + '" data-video="' + esc(id) + '" target="_blank" rel="noopener" title="Video abspielen">' +
+            '<img src="https://img.youtube.com/vi/' + esc(id) + '/hqdefault.jpg" alt="Video" loading="lazy" /></a>';
+        }));
+        return teile.length ? '<div class="medien">' + teile.join('') + '</div>' : '';
+      }
+
+      function popupHtml(p) {
+        var lat = p.zugang[0].toFixed(5);
+        var lon = p.zugang[1].toFixed(5);
+        var park = (p.parkplaetze || []).map(function (pp) {
+          return '<a href="' + esc(pp.navigation) + '" target="_blank" rel="noopener">' + esc(pp.name) + '</a>';
+        });
+        return '<div class="popup">' +
+          '<h3>' + esc(p.name) + '</h3>' +
+          '<span class="dim">' + esc(p.typ) + '</span>' +
+          (p.befischt === false ? '<p class="verbot">Kein Angeln – Zucht-/Hälterweiher</p>' : '') +
+          '<p>' + esc(p.abschnitt) + '</p>' +
+          (istUnsicher(p) ? '<p class="unsicher">Lage/Grenze geschätzt</p>' : '') +
+          '<p class="dim">' + esc(p.hinweis) + '</p>' +
+          (park.length
+            ? '<p class="parkplaetze">Parkplätze (Navigation): ' + park.join(' ') + '</p>'
+            : '<p>Zugang: ' + lat + ', ' + lon + '<br>→ <a href="' + esc(p.navigation) + '" target="_blank" rel="noopener">Navigation (Google Maps)</a></p>') +
+          medienHtml(p.fotos, p.videos) +
+          '</div>';
+      }
+
+      function zusatzHtml(p) {
+        var fotos = typeof p.fotos === 'string' ? JSON.parse(p.fotos) : p.fotos;
+        var titel = p.kind === 'parkplatz' ? 'Parkplatz ' + p.name : p.name;
+        return '<div class="popup">' +
+          '<h3' + (p.kind === 'verbot' ? ' class="verbot"' : '') + '>' + esc(titel) + '</h3>' +
+          '<span class="dim">' + esc(p.gewaesser) + '</span>' +
+          (p.text ? '<p>' + esc(p.text) + '</p>' : '') +
+          (p.navigation ? '<p>→ <a href="' + esc(p.navigation) + '" target="_blank" rel="noopener">Navigation (Google Maps)</a></p>' : '') +
+          medienHtml(fotos, []) +
+          '</div>';
+      }
+
+      function zeigePopup(lngLat, inhalt) {
+        if (popup) popup.remove();
+        popup = new maplibregl.Popup({ maxWidth: 'none', offset: 10 }).setLngLat(lngLat).setHTML(inhalt).addTo(map);
+      }
+
+      function linkerRand() {
+        return window.innerWidth > 560 && !hudEl.classList.contains('zu') ? hudEl.offsetWidth + 30 : 30;
+      }
+
+      function oeffne(name, flieg) {
+        var g = gewaesser.filter(function (x) { return x.name === name; })[0];
+        if (!g) return;
+        Array.prototype.forEach.call(listeEl.querySelectorAll('button.eintrag'), function (el) {
+          el.classList.toggle('aktiv', el.getAttribute('data-name') === name);
+        });
+        zeigePopup([g.p.zugang[1], g.p.zugang[0]], popupHtml(g.p));
+        if (flieg) {
+          map.fitBounds(g.bounds, { padding: { top: 60, bottom: 60, left: linkerRand(), right: 60 }, maxZoom: 15.5 });
+        }
+      }
+
+      function baueListe() {
+        var gruppen = [
+          { kind: 'fliess', titel: 'Fließgewässer', passt: function (g) { return g.kind === 'fliess'; } },
+          { kind: 'still', titel: 'Weiher & Seen', passt: function (g) { return g.kind === 'still' && g.p.befischt !== false; } },
+          { kind: 'still', titel: 'Zucht- & Hälterweiher', zusatz: 'kein Angeln', passt: function (g) { return g.kind === 'still' && g.p.befischt === false; } }
+        ];
+        listeEl.innerHTML = '';
+        gruppen.forEach(function (gr) {
+          var kopf = document.createElement('li');
+          kopf.className = 'gruppe';
+          kopf.setAttribute('data-kind', gr.kind);
+          kopf.innerHTML = esc(gr.titel) + (gr.zusatz ? ' <span class="dim">(' + esc(gr.zusatz) + ')</span>' : '');
+          listeEl.appendChild(kopf);
+          gewaesser.filter(gr.passt).forEach(function (g) {
+            var li = document.createElement('li');
+            li.setAttribute('data-kind', gr.kind);
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'eintrag';
+            b.setAttribute('data-name', g.name);
+            b.innerHTML = '<span class="name">' + esc(g.name) + '</span>' +
+              (istUnsicher(g.p) ? ' <span class="marke" title="Lage oder Abschnittsgrenze geschätzt">?</span>' : '') +
+              '<span class="abschnitt">' + esc(g.p.abschnitt) + '</span>';
+            b.addEventListener('click', function () {
+              if (window.innerWidth <= 560) klappe(true);
+              oeffne(g.name, true);
+            });
+            li.appendChild(b);
+            listeEl.appendChild(li);
+          });
+        });
+      }
+
+      function alleZeigen() {
+        if (!gewaesser.length) return;
+        var b = new maplibregl.LngLatBounds();
+        gewaesser.forEach(function (g) { b.extend(g.bounds); });
+        map.fitBounds(b, { padding: { top: 40, bottom: 40, left: linkerRand(), right: 60 } });
+      }
+
+      function klappe(zu) {
+        hudEl.classList.toggle('zu', zu);
+        btnZuklappen.textContent = zu ? '+' : '–';
+        btnZuklappen.setAttribute('aria-expanded', String(!zu));
+      }
+
+      // ---------- Großansicht: Fotos und YouTube eingebettet (youtube-nocookie) ----------
+
+      var lightboxEl = document.getElementById('lightbox');
+      var lightboxMedium = document.getElementById('lightbox-medium');
+      var lightboxExtern = document.getElementById('lightbox-extern');
+      var lightboxZu = document.getElementById('lightbox-zu');
+
+      function zeigeGross(art, wert) {
+        lightboxMedium.innerHTML = '';
+        if (art === 'video') {
+          var f = document.createElement('iframe');
+          f.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(wert) + '?autoplay=1&rel=0';
+          f.title = 'Video';
+          f.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+          f.allowFullscreen = true;
+          lightboxMedium.appendChild(f);
+          lightboxExtern.href = 'https://www.youtube.com/watch?v=' + encodeURIComponent(wert);
+          lightboxExtern.textContent = 'Auf YouTube öffnen ↗';
+        } else {
+          var img = document.createElement('img');
+          img.src = wert;
+          img.alt = 'Foto';
+          lightboxMedium.appendChild(img);
+          lightboxExtern.href = wert;
+          lightboxExtern.textContent = 'Original öffnen ↗';
+        }
+        lightboxEl.hidden = false;
+        lightboxZu.focus();
+      }
+
+      function schliesseGross() {
+        lightboxEl.hidden = true;
+        lightboxMedium.innerHTML = '';   // stoppt das Video
+      }
+
+      document.addEventListener('click', function (e) {
+        var a = e.target.closest && e.target.closest('a[data-video], a[data-foto]');
+        if (!a) return;
+        e.preventDefault();
+        if (a.hasAttribute('data-video')) zeigeGross('video', a.getAttribute('data-video'));
+        else zeigeGross('foto', a.getAttribute('data-foto'));
+      });
+      lightboxZu.addEventListener('click', schliesseGross);
+      lightboxEl.addEventListener('click', function (e) { if (e.target === lightboxEl) schliesseGross(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !lightboxEl.hidden) schliesseGross(); });
+
+      btnZuklappen.addEventListener('click', function () { klappe(!hudEl.classList.contains('zu')); });
+      btnAlle.addEventListener('click', alleZeigen);
+      btnKml.addEventListener('click', function () {
+        var a = document.createElement('a');
+        a.href = KML_URL;
+        a.download = 'fv-wangen-gewaesser.kml';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      });
+
+      // Klicks: Parkplätze, Verbote und Hinweise vor den Gewässern selbst
+      var KLICK_ZUSATZ = ['parkplatz', 'info', 'verbot-linie', 'verbot-flaeche', 'regel', 'weg'];
+      var KLICK_GEWAESSER = ['zugang', 'fliess-gesichert', 'fliess-unsicher', 'still-flaeche'];
+
+      map.on('click', function (e) {
+        var vorhanden = function (ids) { return ids.filter(function (id) { return map.getLayer(id); }); };
+        var z = map.queryRenderedFeatures(e.point, { layers: vorhanden(KLICK_ZUSATZ) });
+        if (z.length) {
+          var f = z[0];
+          var ll = f.geometry.type === 'Point' ? f.geometry.coordinates : e.lngLat;
+          zeigePopup(ll, zusatzHtml(f.properties));
+          return;
+        }
+        var g = map.queryRenderedFeatures(e.point, { layers: vorhanden(KLICK_GEWAESSER) });
+        if (g.length) oeffne(g[0].properties.name, false);
+      });
+
+      KLICK_ZUSATZ.concat(KLICK_GEWAESSER).forEach(function (id) {
+        map.on('mouseenter', id, function () { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', id, function () { map.getCanvas().style.cursor = ''; });
+      });
+
+      // style.load und die Gewässerdaten kommen in beliebiger Reihenfolge an;
+      // isStyleLoaded() ist währenddessen unzuverlässig (Sprites/Glyphen)
+      var stilGeladen = false;
+
+      map.on('style.load', function () {
+        stilGeladen = true;
+        deutscheBeschriftung();
+        legeLayerAn();
+      });
+
+      fetch(DATEN_URL)
+        .then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function (json) {
+          daten = json;
+          var nachName = {};
+          json.features.forEach(function (f) {
+            var p = f.properties;
+            if (p.kind !== 'fliess' && p.kind !== 'still') return;
+            var g = nachName[p.name] || (nachName[p.name] = { name: p.name, kind: p.kind, p: p, bounds: new maplibregl.LngLatBounds() });
+            g.bounds.extend(grenzen(f.geometry));
+          });
+          gewaesser = Object.keys(nachName).map(function (k) { return nachName[k]; });
+          var befischt = gewaesser.filter(function (g) { return g.p.befischt !== false; }).length;
+          var unsicher = gewaesser.filter(function (g) { return istUnsicher(g.p); }).length;
+          document.getElementById('legende-unsicher').hidden = !unsicher;
+          setStatus(befischt + ' befischte Gewässer, ' + (gewaesser.length - befischt) + ' Zucht-/Hälterweiher.\n' +
+            (unsicher ? unsicher + ' mit geschätzter Lage oder Grenze (?).\n' : '') +
+            'Eintrag antippen für Abschnitt, Parkplätze, Fotos.');
+          baueListe();
+          if (stilGeladen) legeLayerAn();
+          if (!ausschnittAusUrl) alleZeigen();
+        })
+        .catch(function (err) {
+          setStatus('Gewässerdaten konnten nicht geladen werden (' + err.message + ').', 'fehler');
+        });
+
+      if (window.innerWidth <= 560) klappe(true);
+    })();
+  </script>
+</body>
+</html>
